@@ -21,6 +21,7 @@ giskard>=2.0           # unified ML+LLM scan: subgroup performance bias, robustn
 # Demo UI + reporting
 streamlit>=1.30
 plotly>=5.18
+matplotlib>=3.7        # backs pandas Styler.background_gradient in the leaderboard table
 
 # Phase 2+ (generalization / meta-benchmark)
 # openml>=0.14

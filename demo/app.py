@@ -11,7 +11,7 @@ runs Streamlit apps for free).
 from __future__ import annotations
 
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.graph_objects as pgo
 import streamlit as st
 
 from ethikit.data import load_adult, make_synthetic_fairness_dataset
@@ -19,14 +19,14 @@ from ethikit.benchmark import run_benchmark, CLASSIFIERS, family_of
 from ethikit.scoring import normalize, objective_matrix, pareto_front, principle_profile, weighted_score
 from ethikit.report import render_model_cards
 
-def plotly_radar(radar: pd.DataFrame) -> go.Figure:
+def plotly_radar(radar: pd.DataFrame) -> pgo.Figure:
     """One closed polygon per model over the per-principle profile columns."""
     categories = list(radar.columns)
     theta = categories + [categories[0]]  # close the loop
-    fig = go.Figure()
+    fig = pgo.Figure()
     for model in radar.index:
         r = radar.loc[model].fillna(0.0).tolist()
-        fig.add_trace(go.Scatterpolar(
+        fig.add_trace(pgo.Scatterpolar(
             r=r + [r[0]], theta=theta, name=model, fill="toself", opacity=0.55,
         ))
     fig.update_layout(
