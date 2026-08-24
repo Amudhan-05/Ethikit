@@ -10,8 +10,8 @@ import pandas as pd
 
 from ethikit.data import load_adult
 from ethikit.benchmark import run_benchmark, flat_classifiers, family_of
-from ethikit.scoring import leaderboard, normalize, objective_matrix, pareto_front
-from ethikit.report import render_html
+from ethikit.scoring import leaderboard, normalize, objective_matrix, pareto_front, principle_profile
+from ethikit.report import render_html, render_model_cards
 
 pd.set_option("display.width", 140)
 pd.set_option("display.max_columns", 20)
@@ -46,6 +46,11 @@ def main():
 
     out = render_html(ds.name, board, front, "ethikit_report.html")
     print(f"\nHTML report written to: {out}")
+
+    profile = principle_profile(dn)
+    card_paths = render_model_cards(ds.name, raw, profile, front,
+                                     out_dir="model_cards", sensitive_name=ds.sensitive_name)
+    print(f"Model cards written to: {', '.join(card_paths)}")
 
 
 if __name__ == "__main__":

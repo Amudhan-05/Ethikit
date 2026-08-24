@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+ethikit_report.html
+model_cards/
+model_cards_test/
+.streamlit/

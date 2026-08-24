@@ -25,8 +25,10 @@ streamlit run demo/app.py              # interactive UI
 ```
 
 The demo works with **zero network** (synthetic biased dataset) and upgrades to the real
-UCI Adult dataset automatically when online. It works with **just scikit-learn**;
-installing `fairlearn`/`shap`/`giskard` unlocks richer evaluators via graceful fallback.
+UCI Adult dataset automatically when online. It also works with **just scikit-learn** --
+every evaluator prefers `fairlearn`/`shap`/`giskard` when installed and falls back to a
+dependency-free implementation when they aren't (`aif360` and `model-card-toolkit` are
+two examples that don't currently build on Python 3.12; see `requirements.txt`).
 
 ## How it's structured
 
@@ -38,16 +40,21 @@ ethikit/
     base.py              Evaluator ABC + registry  <-- add new tools here
     performance.py       utility axis (accuracy / f1 / auc / r2)
     fairness.py          fairlearn -> numpy fallback (demographic parity, equalized odds)
-    explainability.py    surrogate fidelity (shap -> permutation-importance fallback)
-    robustness.py        perturbation stability (Giskard/ART later)
+    explainability.py    surrogate fidelity + shap attributions -> permutation-importance fallback
+    robustness.py        perturbation stability (dependency-free)
     privacy.py           train/test-gap leakage proxy (membership inference later)
+    giskard_scan.py       unified scan (subgroup performance bias -> fairness, perturbation
+                          robustness -> safety); ART / data-leakage scan later
   data/loaders.py        Adult (+ synthetic fallback) with sensitive attribute
   benchmark/
     models.py            model zoo grouped by family (linear/tree/kernel/…)
     runner.py            train sweep -> run evaluator battery -> tidy records
   scoring/aggregate.py   normalize -> profile -> Pareto -> optional weighted score
-  report/report.py       self-contained HTML report
-demo/app.py              Streamlit UI
+  report/
+    report.py            self-contained aggregate HTML report
+    model_card.py         one Model Card per model (schema-compliant HTML;
+                          model-card-toolkit sidecar JSON when installable)
+demo/app.py              Streamlit UI (Plotly radar + per-model Model Card viewer)
 examples/run_demo.py     end-to-end CLI demo
 ```
 

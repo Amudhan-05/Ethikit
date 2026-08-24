@@ -11,11 +11,30 @@ runs Streamlit apps for free).
 from __future__ import annotations
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from ethikit.data import load_adult, make_synthetic_fairness_dataset
 from ethikit.benchmark import run_benchmark, CLASSIFIERS, family_of
-from ethikit.scoring import normalize, objective_matrix, pareto_front, weighted_score
+from ethikit.scoring import normalize, objective_matrix, pareto_front, principle_profile, weighted_score
+from ethikit.report import render_model_cards
+
+def plotly_radar(radar: pd.DataFrame) -> go.Figure:
+    """One closed polygon per model over the per-principle profile columns."""
+    categories = list(radar.columns)
+    theta = categories + [categories[0]]  # close the loop
+    fig = go.Figure()
+    for model in radar.index:
+        r = radar.loc[model].fillna(0.0).tolist()
+        fig.add_trace(go.Scatterpolar(
+            r=r + [r[0]], theta=theta, name=model, fill="toself", opacity=0.55,
+        ))
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+        showlegend=True, margin=dict(l=40, r=40, t=20, b=20), height=420,
+    )
+    return fig
+
 
 st.set_page_config(page_title="Ethikit", layout="wide")
 st.title("Ethikit — ethical AI model evaluator")
@@ -65,12 +84,28 @@ if go:
     with c1:
         st.subheader("Per-principle radar")
         radar = objective_matrix(dn).drop(columns=["utility"], errors="ignore")
-        st.line_chart(radar.T)  # simple; swap for a true radar with plotly
+        st.plotly_chart(plotly_radar(radar), use_container_width=True)
     with c2:
         st.subheader("Pareto-optimal models")
         for m in front:
             st.markdown(f"- **{m}** ({family_of(m)})")
         st.info("These aren't beaten on every objective at once. "
                 "The final pick is a value judgement.")
+
+    st.subheader("Model cards")
+    st.caption("Accountability + transparency deliverable, one per model "
+              "(model details, quantitative analysis, ethical considerations, caveats).")
+    picked = st.selectbox("Model", list(obj.index))
+    if picked:
+        card_paths = render_model_cards(
+            ds.name, raw, principle_profile(dn), front,
+            out_dir="model_cards", sensitive_name=ds.sensitive_name,
+        )
+        card_path = next(p for p in card_paths if p.endswith(f"{picked}.html"))
+        with open(card_path, encoding="utf-8") as fh:
+            card_html = fh.read()
+        st.components.v1.html(card_html, height=900, scrolling=True)
+        st.download_button("Download this model card (HTML)", card_html,
+                           file_name=f"{picked}_model_card.html", mime="text/html")
 else:
     st.info("Set options in the sidebar and click **Run evaluation**.")
