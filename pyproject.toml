@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ethikit"
+version = "0.1.0"
+description = "Open-source orchestrator for evaluating the ethicality of ML models"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "pandas>=2.0", "scikit-learn>=1.3"]
+
+[project.optional-dependencies]
+full = ["fairlearn>=0.10", "shap>=0.44", "streamlit>=1.30", "plotly>=5.18"]
+
+[tool.setuptools.packages.find]
+include = ["ethikit*"]
