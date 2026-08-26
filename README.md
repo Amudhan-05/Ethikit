@@ -35,13 +35,23 @@ means. `ethikit.benchmark.meta` runs the same idea across *multiple datasets* (v
 so "best model per family, in general" is an aggregate finding, not a one-dataset story.
 See `examples/run_phase2_demo.py`.
 
+A fourth thing: the Phase-1 privacy check and the Gaussian-noise robustness check were
+both intentionally-labelled proxies, not attacks. Phase 3 replaces/complements them with
+real ones: `ethikit.evaluators.privacy` now runs an actual black-box membership-inference
+attack (confidence/loss-threshold, Yeom et al. 2018) instead of a train/test-gap heuristic;
+`ethikit.evaluators.art_robustness` runs a real adversarial evasion attack (HopSkipJump,
+via the Adversarial Robustness Toolbox) instead of random noise; `ethikit.evaluators.drift`
+runs Alibi Detect's actual statistical drift test against a manufactured distribution
+shift. See `examples/run_phase3_demo.py`.
+
 ## Quick start
 
 ```bash
-pip install -r requirements.txt        # or: pip install -e ".[full,phase2]"
+pip install -r requirements.txt        # or: pip install -e ".[full,phase2,phase3]"
 python -m examples.run_demo            # single-dataset demo; runs offline on synthetic data
 streamlit run demo/app.py              # interactive UI
 python -m examples.run_phase2_demo     # generalization: CV, significance, meta-benchmark
+python -m examples.run_phase3_demo     # real attacks: membership inference, adversarial, drift
 ```
 
 The demo works with **zero network** (synthetic biased dataset) and upgrades to the real
@@ -62,10 +72,15 @@ ethikit/
     performance.py       utility axis (accuracy / f1 / auc / r2)
     fairness.py          fairlearn -> numpy fallback (demographic parity, equalized odds)
     explainability.py    surrogate fidelity + shap attributions -> permutation-importance fallback
-    robustness.py        perturbation stability (dependency-free)
-    privacy.py           train/test-gap leakage proxy (membership inference later)
+    robustness.py        perturbation stability under random Gaussian noise (dependency-free)
+    privacy.py           REAL membership-inference attack (confidence/loss-threshold,
+                          cross-validated attack classifier) -- no proxy anymore
     giskard_scan.py       unified scan (subgroup performance bias -> fairness, perturbation
-                          robustness -> safety); ART / data-leakage scan later
+                          robustness -> safety); data-leakage scan not wired in
+    art_robustness.py     Phase 3: real black-box adversarial attack (HopSkipJump via ART) --
+                          worst-case robustness, complementing robustness.py's random-noise case
+    drift.py               Phase 3: Alibi Detect's statistical drift test against a manufactured
+                          covariate shift + the model's own performance drop under it
   data/loaders.py        Adult (+ synthetic fallback), RawData + split_dataset() so a
                           single split and repeated CV scale/split identically
   benchmark/
@@ -87,6 +102,7 @@ demo/app.py              Streamlit UI (Plotly radar + per-model Model Card viewe
 examples/
   run_demo.py            single-dataset, single-split end-to-end CLI demo
   run_phase2_demo.py      CV + significance + meta-benchmark + regression fairness
+  run_phase3_demo.py      membership inference + adversarial robustness + drift detection
 ```
 
 ## Extending it (the whole point)

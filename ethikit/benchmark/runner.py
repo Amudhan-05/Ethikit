@@ -22,13 +22,19 @@ def _predict_all(model, ds: Dataset) -> EvalContext:
     y_pred = model.predict(ds.X_test)
     y_pred_train = model.predict(ds.X_train)
     y_proba = None
+    y_proba_train = None
     if hasattr(model, "predict_proba"):
         try:
             y_proba = model.predict_proba(ds.X_test)
         except Exception:
             y_proba = None
+        try:
+            y_proba_train = model.predict_proba(ds.X_train)
+        except Exception:
+            y_proba_train = None
     return EvalContext(model=model, dataset=ds, y_pred=y_pred,
-                       y_pred_train=y_pred_train, y_proba=y_proba)
+                       y_pred_train=y_pred_train, y_proba=y_proba,
+                       y_proba_train=y_proba_train)
 
 
 def run_benchmark(dataset: Dataset,

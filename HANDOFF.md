@@ -16,9 +16,10 @@ explainability maths — it coordinates the libraries that already do.
   provenance and a `tool_addressable` flag (`ethikit/principles.py`).
 - **Evaluator interface + registry** — add a tool by subclassing `Evaluator` and calling
   `register()`; nothing else changes (`ethikit/evaluators/base.py`).
-- Five working evaluators: performance (utility), fairness, explainability, robustness,
-  privacy-proxy. Each **prefers a real library and falls back to numpy/sklearn** so the
-  demo runs anywhere.
+- Eight working evaluators: performance (utility), fairness, explainability, robustness,
+  membership-inference privacy attack, Giskard scan, ART adversarial robustness, and
+  drift detection. Each **prefers a real library and falls back to numpy/sklearn** so the
+  demo runs anywhere it can (a few are gated on optional deps -- see `available()`).
 - **Model zoo** of stock sklearn classifiers grouped by family (`benchmark/models.py`).
 - **Runner** that trains a sweep and runs the battery (`benchmark/runner.py`).
 - **Scoring**: min-max normalisation, per-principle profile, Pareto front over
@@ -66,11 +67,25 @@ explainability maths — it coordinates the libraries that already do.
 - Add regression fairness (group MAE/MSE) — `FairnessEvaluator.supports` currently
   classification only.
 
-### Phase 3 — privacy & robustness (deeper)
-- Swap the privacy proxy for a real **membership-inference attack** (TensorFlow Privacy)
-  and optional **DP-SGD** training (Opacus for PyTorch).
-- Add the **Adversarial Robustness Toolbox** as a robustness evaluator (real attacks).
-- Add **drift/outlier** checks (Alibi Detect) for deployment-time behaviour.
+### Phase 3 — privacy & robustness (deeper) [DONE]
+- Swapped the privacy proxy for a real **membership-inference attack**
+  (`ethikit/evaluators/privacy.py`): confidence/loss-threshold attack (Yeom et al. 2018)
+  with a cross-validated LogisticRegression attack classifier, reporting attack AUC +
+  advantage. TensorFlow Privacy's latest release (0.8.11) hard-pins `pandas~=1.4`, which
+  has no Python 3.12 wheel and fails to build from source here (confirmed by hand,
+  same class of blocker as AIF360) -- its attack algorithm is implemented natively
+  against scikit-learn instead of pulling the unmaintained package in. DP-SGD (Opacus)
+  not wired in -- no evaluator currently needs a trainable-with-DP model.
+- Added the **Adversarial Robustness Toolbox** as a robustness evaluator
+  (`ethikit/evaluators/art_robustness.py`): real black-box HopSkipJump evasion attack,
+  classification only, tight query/iteration budget (measured by hand against
+  RandomForest/GradientBoosting to keep a full model-zoo sweep to ~1-2 minutes).
+- Added **drift detection** (`ethikit/evaluators/drift.py`) via Alibi Detect's
+  TabularDrift: manufactures a synthetic covariate shift, checks whether the detector
+  catches it, and measures the model's own performance drop under it.
+- All three tagged `privacy`/`safety` and picked up automatically by
+  `ethikit.coverage`'s reverse mapping and every report/Model Card -- no wiring beyond
+  registering each evaluator. See `examples/run_phase3_demo.py`.
 
 ### Phase 4 — deep learning & LLMs
 - The adapter interface already isolates model specifics. For DL: add a **Captum**

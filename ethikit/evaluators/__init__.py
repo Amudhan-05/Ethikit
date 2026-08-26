@@ -1,3 +1,6 @@
 """Importing this package registers all built-in evaluators."""
-from . import performance, fairness, explainability, robustness, privacy, giskard_scan  # noqa: F401
+from . import (  # noqa: F401
+    performance, fairness, explainability, robustness, privacy, giskard_scan,
+    art_robustness, drift,
+)
 from .base import Evaluator, register, all_evaluators, available_evaluators  # noqa: F401

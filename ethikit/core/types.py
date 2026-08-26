@@ -38,6 +38,7 @@ class EvalContext:
     y_pred: Any = None          # cached test predictions
     y_pred_train: Any = None    # cached train predictions (for leakage checks)
     y_proba: Any = None         # cached test probabilities if available
+    y_proba_train: Any = None   # cached train probabilities if available (membership inference)
 
 
 @dataclass

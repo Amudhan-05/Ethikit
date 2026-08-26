@@ -16,7 +16,8 @@ giskard>=2.0           # unified ML+LLM scan: subgroup performance bias, robustn
 # model-card-toolkit   # real Model Cards backend; its absl-py pin also fails to
                        # build on Python 3.12 here -- ethikit ships an equivalent
                        # hand-rolled renderer in ethikit/report/model_card.py instead
-# adversarial-robustness-toolbox>=1.17   # attacks / robustness
+adversarial-robustness-toolbox>=1.17   # real black-box adversarial attacks (HopSkipJump)
+alibi-detect>=0.12                     # statistical drift detection (TabularDrift)
 
 # Demo UI + reporting
 streamlit>=1.30
@@ -28,8 +29,13 @@ pmlb>=1.0               # meta-benchmark dataset suite (github-hosted, no API ke
 scipy>=1.11              # Friedman test (already pulled in transitively by giskard)
 scikit-posthocs>=0.9    # Nemenyi post-hoc + critical-difference diagram
 
-# Phase 3 (privacy) / Phase 4 (deep learning + LLMs)
-# tensorflow-privacy   # DP-SGD + membership inference
-# opacus               # DP-SGD for PyTorch
+# Phase 3: membership inference is hand-rolled directly on scikit-learn in
+# ethikit/evaluators/privacy.py -- tensorflow-privacy's latest release
+# (0.8.11) hard-pins pandas~=1.4, which has no Python 3.12 wheel and fails to
+# build from source here (confirmed by hand); its own attack algorithm is
+# implemented natively instead of pulling the unmaintained package in.
+# opacus               # DP-SGD for PyTorch (not wired in; no evaluator needs it yet)
+
+# Phase 4 (deep learning + LLMs)
 # captum               # DL explainability
 # deepeval             # LLM evaluation + red-teaming (deepteam)
