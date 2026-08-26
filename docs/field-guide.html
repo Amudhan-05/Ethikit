@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ethikit Field Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f6f3ea; --bg-raised:#fffdf8; --bg-sunken:#efe9db;
+  --ink:#1b1f19; --ink-dim:#5c6259; --ink-faint:#8a8f80;
+  --rule:#ddd6c4; --rule-strong:#c7bea6;
+  --accent:#2c6a4f; --accent-ink:#ffffff; --accent-soft:#e2eee5; --accent-rule:#a8cdb7;
+  --gold:#93691c; --gold-soft:#f3e8cd; --gold-rule:#dcc27f;
+  --red:#a04a35; --red-soft:#f4e2da; --red-rule:#dba28d;
+  --mono-surface:#eeead9; --mono-ink:#3c4535;
+  --shadow: 0 1px 0 rgba(27,31,25,.05);
+  --font-display:"Big Shoulders",'Arial Narrow',sans-serif;
+  --font-body:"Public Sans",-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12160f; --bg-raised:#1a1f17; --bg-sunken:#0d1109;
+    --ink:#eae6d8; --ink-dim:#a3a894; --ink-faint:#767c68;
+    --rule:#2c3226; --rule-strong:#3c4432;
+    --accent:#74c39a; --accent-ink:#0c1710; --accent-soft:#1c2b21; --accent-rule:#33513f;
+    --gold:#d9b354; --gold-soft:#2b2513; --gold-rule:#4a3d1c;
+    --red:#d98a70; --red-soft:#2c1e17; --red-rule:#4a3226;
+    --mono-surface:#1c2118; --mono-ink:#c7d0ba;
+    --shadow: 0 1px 0 rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12160f; --bg-raised:#1a1f17; --bg-sunken:#0d1109;
+  --ink:#eae6d8; --ink-dim:#a3a894; --ink-faint:#767c68;
+  --rule:#2c3226; --rule-strong:#3c4432;
+  --accent:#74c39a; --accent-ink:#0c1710; --accent-soft:#1c2b21; --accent-rule:#33513f;
+  --gold:#d9b354; --gold-soft:#2b2513; --gold-rule:#4a3d1c;
+  --red:#d98a70; --red-soft:#2c1e17; --red-rule:#4a3226;
+  --mono-surface:#1c2118; --mono-ink:#c7d0ba;
+  --shadow: 0 1px 0 rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body);
+  font-size:16px; line-height:1.55; font-weight:400;
+}
+::selection{background:var(--accent-soft); color:var(--ink)}
+a{color:var(--accent)}
+a:focus-visible, button:focus-visible, .navlink:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+h1,h2,h3{font-family:var(--font-display); font-weight:700; text-wrap:balance; letter-spacing:.01em; line-height:1.02; margin:0}
+.eyebrow{font-family:var(--font-mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint)}
+code, .mono{font-family:var(--font-mono)}
+p{margin:0 0 .9em; max-width:66ch}
+.dim{color:var(--ink-dim)}
+
+.wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+/* ---------- header ---------- */
+header.masthead{
+  padding:52px 0 34px; border-bottom:1px solid var(--rule);
+}
+header.masthead .kicker{display:flex; align-items:baseline; gap:10px; margin-bottom:18px}
+header.masthead h1{font-size:clamp(34px,5vw,58px); letter-spacing:0}
+header.masthead .lede{font-size:18px; color:var(--ink-dim); max-width:62ch; margin-top:14px}
+.statrow{display:flex; flex-wrap:wrap; gap:0; margin-top:30px; border:1px solid var(--rule); border-radius:3px; overflow:hidden}
+.stat{flex:1 1 140px; padding:14px 18px; border-right:1px solid var(--rule); background:var(--bg-raised)}
+.stat:last-child{border-right:none}
+.stat .n{font-family:var(--font-display); font-size:30px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--accent)}
+.stat .l{font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint)}
+
+/* ---------- nav ---------- */
+nav.jump{
+  position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--rule);
+  padding:10px 0;
+}
+nav.jump .row{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; scrollbar-width:thin}
+nav.jump a{
+  font-family:var(--font-mono); font-size:12.5px; white-space:nowrap; color:var(--ink-dim);
+  text-decoration:none; padding:7px 12px; border-radius:20px; border:1px solid transparent;
+}
+nav.jump a:hover{border-color:var(--rule-strong); color:var(--ink)}
+
+/* ---------- sections ---------- */
+main{padding:0 0 90px}
+section.block{padding:56px 0; border-bottom:1px solid var(--rule)}
+section.block:last-of-type{border-bottom:none}
+.section-head{display:flex; align-items:baseline; gap:16px; margin-bottom:28px; flex-wrap:wrap}
+.section-head h2{font-size:clamp(24px,3vw,34px)}
+.section-head .tag{font-family:var(--font-mono); font-size:11.5px; padding:4px 9px; border-radius:3px; letter-spacing:.04em}
+.tag.green{background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-rule)}
+.tag.gold{background:var(--gold-soft); color:var(--gold); border:1px solid var(--gold-rule)}
+.tag.red{background:var(--red-soft); color:var(--red); border:1px solid var(--red-rule)}
+.section-intro{max-width:70ch; color:var(--ink-dim); margin-bottom:30px}
+
+/* ---------- demo script cue cards ---------- */
+.cue-list{display:flex; flex-direction:column; gap:0; border-top:1px solid var(--rule)}
+.cue{display:grid; grid-template-columns:64px 1fr; gap:22px; padding:22px 0; border-bottom:1px solid var(--rule)}
+.cue .num{font-family:var(--font-display); font-size:34px; font-weight:800; color:var(--rule-strong); line-height:1}
+.cue.live .num{color:var(--accent)}
+.cue-body h3{font-size:19px; margin-bottom:6px}
+.cue-meta{display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap}
+.pill{font-family:var(--font-mono); font-size:11px; letter-spacing:.03em; padding:3px 9px; border-radius:20px; background:var(--bg-sunken); color:var(--ink-dim); border:1px solid var(--rule)}
+.pill.time{color:var(--gold); border-color:var(--gold-rule); background:var(--gold-soft)}
+.cue-say{
+  background:var(--bg-raised); border-left:3px solid var(--accent-rule); padding:11px 16px; border-radius:0 4px 4px 0;
+  font-size:14.5px; color:var(--ink-dim); margin:10px 0 4px; font-style:italic;
+}
+.cue-say b{font-style:normal; color:var(--ink); font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; display:block; margin-bottom:4px; font-weight:600}
+.fallback{font-size:13.5px; color:var(--ink-faint); margin-top:8px}
+.fallback b{color:var(--ink-dim); font-weight:600}
+
+/* ---------- diagram ---------- */
+figure.diagram{margin:0; padding:0}
+.diagram-frame{background:var(--bg-raised); border:1px solid var(--rule); border-radius:6px; padding:20px; overflow-x:auto}
+.diagram-frame svg{display:block; min-width:760px; width:100%; height:auto}
+figcaption{font-size:13.5px; color:var(--ink-faint); margin-top:12px; max-width:70ch}
+
+/* ---------- spec cards (pipeline stages) ---------- */
+.spec-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px}
+.spec{background:var(--bg-raised); border:1px solid var(--rule); border-radius:6px; padding:20px 22px; box-shadow:var(--shadow)}
+.spec h3{font-size:18px; margin-bottom:2px}
+.spec .file{font-family:var(--font-mono); font-size:12px; color:var(--ink-faint); margin-bottom:14px; display:block}
+.spec dl{margin:0; display:grid; grid-template-columns:64px 1fr; gap:6px 12px; font-size:13.5px}
+.spec dt{font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); padding-top:2px}
+.spec dd{margin:0; color:var(--ink-dim)}
+.spec dd code{background:var(--mono-surface); color:var(--mono-ink); padding:1px 5px; border-radius:3px; font-size:12px}
+
+/* ---------- evaluator cards ---------- */
+.eval-grid{display:grid; grid-template-columns:1fr; gap:14px}
+.evalcard{
+  background:var(--bg-raised); border:1px solid var(--rule); border-radius:6px; padding:22px 24px;
+  display:grid; grid-template-columns:1fr; gap:14px;
+}
+.evalcard.real{border-color:var(--red-rule)}
+.eh{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap}
+.eh h3{font-size:20px}
+.eh .file{font-family:var(--font-mono); font-size:12px; color:var(--ink-faint); margin-top:3px; display:block}
+.badges{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end}
+.evalcard p.mech{
+  background:var(--mono-surface); color:var(--mono-ink); font-family:var(--font-mono); font-size:12.5px;
+  padding:12px 14px; border-radius:4px; line-height:1.5; margin:0; max-width:none;
+}
+.evrow{display:grid; grid-template-columns:130px 1fr; gap:10px 16px; font-size:14px}
+.evrow dt{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); padding-top:2px}
+.evrow dd{margin:0; color:var(--ink-dim)}
+.evidence{
+  border-left:3px solid var(--accent-rule); padding:8px 14px; font-size:13.5px; color:var(--ink-dim); background:var(--accent-soft);
+  border-radius:0 4px 4px 0;
+}
+.evalcard.real .evidence{border-left-color:var(--red-rule); background:var(--red-soft)}
+
+/* ---------- tables ---------- */
+.tblwrap{overflow-x:auto; border:1px solid var(--rule); border-radius:6px}
+table{border-collapse:collapse; width:100%; font-size:13.5px; min-width:640px}
+th,td{padding:10px 14px; text-align:left; border-bottom:1px solid var(--rule); vertical-align:top}
+th{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); background:var(--bg-sunken)}
+tr:last-child td{border-bottom:none}
+td code{font-family:var(--font-mono); font-size:12px; background:var(--mono-surface); color:var(--mono-ink); padding:1px 5px; border-radius:3px}
+
+/* ---------- decoder ---------- */
+.decoder{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px}
+.dcard{background:var(--bg-raised); border:1px solid var(--rule); border-radius:6px; padding:18px 20px}
+.dcard .k{font-family:var(--font-mono); font-size:13px; color:var(--accent); margin-bottom:6px; display:block}
+.dcard p{font-size:14px; color:var(--ink-dim); margin:0}
+
+/* ---------- commands ---------- */
+.cmdlist{display:flex; flex-direction:column; gap:0; border:1px solid var(--rule); border-radius:6px; overflow:hidden}
+.cmdrow{display:grid; grid-template-columns:minmax(220px,340px) 1fr; gap:16px; padding:13px 18px; border-bottom:1px solid var(--rule); align-items:center}
+.cmdrow:last-child{border-bottom:none}
+.cmdrow:nth-child(odd){background:var(--bg-raised)}
+.cmdrow code{font-family:var(--font-mono); font-size:13px; color:var(--accent)}
+.cmdrow span{font-size:13.5px; color:var(--ink-dim)}
+
+footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
+
+@media (max-width:720px){
+  .cue{grid-template-columns:40px 1fr; gap:14px}
+  .cue .num{font-size:24px}
+  .evrow{grid-template-columns:100px 1fr}
+}
+</style>
+</head>
+<body>
+
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="kicker">
+      <span class="eyebrow">ethikit · internal reference</span>
+    </div>
+    <h1>Field Guide to Ethikit</h1>
+    <p class="lede">Everything the project actually does, how to read its output, and a demo script tuned for a short live walkthrough with a narrated fallback if the laptop doesn't cooperate.</p>
+    <div class="statrow">
+      <div class="stat"><div class="n">8</div><div class="l">evaluators</div></div>
+      <div class="stat"><div class="n">9</div><div class="l">principles tracked</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">phases shipped</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">real attacks run</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">black-box scores</div></div>
+    </div>
+  </div>
+</header>
+
+<nav class="jump">
+  <div class="wrap row">
+    <a href="#script">Demo script</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#pipeline">Pipeline stages</a>
+    <a href="#evaluators">The 8 evaluators</a>
+    <a href="#reading">Reading any output</a>
+    <a href="#evidence">Rigor evidence</a>
+    <a href="#roadmap">What's next</a>
+    <a href="#commands">Commands</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ============ DEMO SCRIPT ============ -->
+<section class="block" id="script">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Demo script</h2>
+      <span class="tag green">~8 minutes</span>
+    </div>
+    <p class="section-intro">Built for a small live demo with a narrated fallback — every step has something to click <em>and</em> something to say if you'd rather just talk through it. Order matters here, so it's numbered like the run sheet it is. Total run time assumes the Streamlit app and one pre-generated report are already open in tabs before your mentors sit down.</p>
+
+    <div class="cue-list">
+
+      <div class="cue live">
+        <div class="num">01</div>
+        <div class="cue-body">
+          <h3>Open on the problem, not the tool</h3>
+          <div class="cue-meta"><span class="pill time">45 sec</span><span class="pill">framing</span></div>
+          <p>Don't lead with code. Lead with the actual hard problem: you can't compress "is this model ethical" into one number, because some fairness definitions are mathematically incompatible with each other — satisfying one can force you to violate another (Kleinberg / Chouldechova). So ethikit refuses to fake a single score.</p>
+          <div class="cue-say"><b>Say</b>"Ethikit isn't a scorer — it's an orchestrator. It runs real fairness, privacy, and robustness tools against your models and lays out the trade-offs, instead of pretending there's one 'most ethical' answer."</div>
+        </div>
+      </div>
+
+      <div class="cue live">
+        <div class="num">02</div>
+        <div class="cue-body">
+          <h3>Live: run the Streamlit app</h3>
+          <div class="cue-meta"><span class="pill time">3 min</span><span class="pill">usability</span><span class="pill">live</span></div>
+          <p><code>streamlit run demo/app.py</code> — pick 2-3 model families, hit run, and let the leaderboard + Plotly radar populate. Point at the radar chart first: each spoke is a principle, each colored polygon is a model, and a bigger polygon is strictly better on that axis. Then point at the leaderboard table and explain the weighted-score column only exists because <em>you</em> supplied weights — the tool never invents them.</p>
+          <div class="cue-say"><b>Say</b>"Every one of these numbers is 0 to 1, always oriented so 1 is best — even where the underlying metric is naturally 'lower is better,' like an error rate. That normalization happens once, in one place, so nothing downstream has to remember which direction is good."</div>
+          <div class="fallback"><b>If the app won't start:</b> open the pre-generated <code>ethikit_report.html</code> in a browser tab instead — same leaderboard and Pareto front, just static. Say "this is what the same run looks like exported as a shareable report."</div>
+        </div>
+      </div>
+
+      <div class="cue live">
+        <div class="num">03</div>
+        <div class="cue-body">
+          <h3>Live: open one Model Card</h3>
+          <div class="cue-meta"><span class="pill time">2 min</span><span class="pill">usability</span><span class="pill">architecture</span></div>
+          <p>Click into any model's card. Scroll straight to <strong>Quantitative Analysis</strong> and point at the <strong>Mechanism</strong> column — this is the single most important thing to show. Every row explains, in one sentence, exactly what computation produced that number: sample sizes, which library ran, which rows were compared. Then scroll to <strong>Tool coverage</strong> and show that a principle like "safety" has three independent tools corroborating it, and each one is one click away from being swapped or added to.</p>
+          <div class="cue-say"><b>Say</b>"No score here is a black box. Every single row traces back to a plain-English sentence of what actually happened — and this card also tells you what <em>other</em> registered tools could have scored this same principle, so picking a tool is a visible choice too, not a hidden default."</div>
+        </div>
+      </div>
+
+      <div class="cue">
+        <div class="num">04</div>
+        <div class="cue-body">
+          <h3>Reveal the architecture (works with or without the laptop)</h3>
+          <div class="cue-meta"><span class="pill time">1.5 min</span><span class="pill">architecture / extensibility</span></div>
+          <p>This is the point to zoom out and either show <code>README.md</code>'s "Extending it" snippet or just describe it verbally — it's short enough to say from memory. Adding an entirely new ethics tool is one file: subclass <code>Evaluator</code>, implement <code>evaluate()</code>, call <code>register()</code>. Nothing else changes — the runner, the scoring, the coverage lookup, and every report discover it automatically.</p>
+          <div class="cue-say"><b>Say</b>"This has actually been tested three times over three build phases — I've added a SHAP wrapper, a Giskard scanner, and a real adversarial-attack evaluator, and none of them required touching the pipeline. The registry pattern is the whole extensibility story."</div>
+        </div>
+      </div>
+
+      <div class="cue">
+        <div class="num">05</div>
+        <div class="cue-body">
+          <h3>The rigor flex — real attacks, not toy metrics</h3>
+          <div class="cue-meta"><span class="pill time">1.5 min</span><span class="pill">optional / if time</span></div>
+          <p>If there's time or a pointed question, this is where you show that "ethics evaluation" here means genuinely attacking the model. A hand-off document originally asked for a TensorFlow-Privacy-based membership-inference attack; that package doesn't even install on Python 3.12 anymore, so the actual attack algorithm was implemented natively instead — a real black-box attack (Yeom et al. 2018) that tries to guess which rows a model was trained on. It correctly picked out an overfit random forest as the leakiest model and a plain logistic regression as the safest, on the same data.</p>
+          <div class="cue-say"><b>Say</b>"When a dependency didn't work, the answer wasn't a weaker proxy quietly relabeled as the real thing — it was implementing the published algorithm directly. Same story for the adversarial-robustness and drift-detection evaluators."</div>
+        </div>
+      </div>
+
+      <div class="cue">
+        <div class="num">06</div>
+        <div class="cue-body">
+          <h3>Close on what's next</h3>
+          <div class="cue-meta"><span class="pill time">30 sec</span><span class="pill">close</span></div>
+          <p>End on the roadmap, not a summary — it signals this is an active project with a plan, not a finished demo. The next phase extends the same registry to deep-learning and LLM evaluators (Captum, Giskard's LLM scan), which is a genuinely bigger architectural jump since the whole pipeline currently assumes tabular sklearn-style models.</p>
+          <div class="cue-say"><b>Say</b>"Everything so far has been sklearn-shaped. The next open question is what the model context needs to look like once it's a prompt or a tensor instead of a row of numbers."</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section class="block" id="architecture">
+  <div class="wrap">
+    <div class="section-head"><h2>Architecture at a glance</h2></div>
+    <p class="section-intro">One dataset, one sweep of models, one battery of evaluators run against each — and every stage after that is generic. This is the diagram to have in your head even if you never put it on a slide.</p>
+
+    <figure class="diagram">
+      <div class="diagram-frame">
+        <svg viewBox="0 0 1200 300" role="img" aria-label="Pipeline: Dataset splits into train and test; models are fit and used to build an EvalContext; the Evaluator Registry runs all eight registered evaluators against that context; results become tidy records; Scoring normalizes and ranks them; Reports render the leaderboard, radar chart, and Model Cards. A separate coverage.py module reads the registry's principle tags and mechanisms and feeds them into every report.">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+            <marker id="arrowd" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor" opacity=".6"/>
+            </marker>
+          </defs>
+
+          <!-- nodes: x,150w,80h at y=40 -->
+          <g font-family="IBM Plex Mono, monospace" font-size="12">
+            <!-- node 1 -->
+            <rect x="30" y="40" width="150" height="80" rx="4" fill="none" stroke="currentColor" opacity=".55"/>
+            <text x="105" y="72" text-anchor="middle" font-weight="600" font-size="14" fill="currentColor">Dataset</text>
+            <text x="105" y="92" text-anchor="middle" fill="currentColor" opacity=".6">RawData →</text>
+            <text x="105" y="106" text-anchor="middle" fill="currentColor" opacity=".6">split_dataset()</text>
+
+            <!-- node 2 -->
+            <rect x="230" y="40" width="150" height="80" rx="4" fill="none" stroke="currentColor" opacity=".55"/>
+            <text x="305" y="66" text-anchor="middle" font-weight="600" font-size="14" fill="currentColor">Fit &amp; Predict</text>
+            <text x="305" y="86" text-anchor="middle" fill="currentColor" opacity=".6">builds</text>
+            <text x="305" y="102" text-anchor="middle" fill="currentColor" opacity=".6">EvalContext</text>
+
+            <!-- node 3 (accent) -->
+            <rect x="430" y="40" width="150" height="80" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+            <text x="505" y="66" text-anchor="middle" font-weight="700" font-size="14" fill="var(--accent)">Evaluator</text>
+            <text x="505" y="83" text-anchor="middle" font-weight="700" font-size="14" fill="var(--accent)">Registry</text>
+            <text x="505" y="102" text-anchor="middle" fill="var(--accent)" opacity=".8">8 registered tools</text>
+
+            <!-- node 4 -->
+            <rect x="630" y="40" width="150" height="80" rx="4" fill="none" stroke="currentColor" opacity=".55"/>
+            <text x="705" y="66" text-anchor="middle" font-weight="600" font-size="14" fill="currentColor">Tidy Records</text>
+            <text x="705" y="86" text-anchor="middle" fill="currentColor" opacity=".6">one row per</text>
+            <text x="705" y="102" text-anchor="middle" fill="currentColor" opacity=".6">model × metric</text>
+
+            <!-- node 5 -->
+            <rect x="830" y="40" width="150" height="80" rx="4" fill="none" stroke="currentColor" opacity=".55"/>
+            <text x="905" y="66" text-anchor="middle" font-weight="600" font-size="14" fill="currentColor">Scoring</text>
+            <text x="905" y="86" text-anchor="middle" fill="currentColor" opacity=".6">normalize →</text>
+            <text x="905" y="102" text-anchor="middle" fill="currentColor" opacity=".6">profile → Pareto</text>
+
+            <!-- node 6 -->
+            <rect x="1030" y="40" width="150" height="80" rx="4" fill="none" stroke="currentColor" opacity=".55"/>
+            <text x="1105" y="66" text-anchor="middle" font-weight="600" font-size="14" fill="currentColor">Reports</text>
+            <text x="1105" y="86" text-anchor="middle" fill="currentColor" opacity=".6">HTML + Model</text>
+            <text x="1105" y="102" text-anchor="middle" fill="currentColor" opacity=".6">Cards + UI</text>
+          </g>
+
+          <!-- arrows -->
+          <g stroke="currentColor" stroke-width="1.4" opacity=".85">
+            <line x1="180" y1="80" x2="222" y2="80" marker-end="url(#arrow)"/>
+            <line x1="380" y1="80" x2="422" y2="80" marker-end="url(#arrow)"/>
+            <line x1="580" y1="80" x2="622" y2="80" marker-end="url(#arrow)"/>
+            <line x1="780" y1="80" x2="822" y2="80" marker-end="url(#arrow)"/>
+            <line x1="980" y1="80" x2="1022" y2="80" marker-end="url(#arrow)"/>
+          </g>
+          <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor" opacity=".65">
+            <text x="201" y="72" text-anchor="middle">scaled</text>
+            <text x="401" y="72" text-anchor="middle">y_pred,</text>
+            <text x="401" y="83" text-anchor="middle">y_proba</text>
+            <text x="601" y="72" text-anchor="middle">evaluate()</text>
+            <text x="601" y="83" text-anchor="middle">× 8</text>
+            <text x="801" y="72" text-anchor="middle">as_record()</text>
+            <text x="1001" y="72" text-anchor="middle">weighted_</text>
+            <text x="1001" y="83" text-anchor="middle">score()</text>
+          </g>
+
+          <!-- coverage callout -->
+          <rect x="430" y="210" width="220" height="66" rx="4" fill="var(--gold-soft)" stroke="var(--gold)" stroke-width="1.2"/>
+          <text x="540" y="234" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-weight="600" font-size="13" fill="var(--gold)">coverage.py</text>
+          <text x="540" y="252" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--gold)" opacity=".85">reverse map:</text>
+          <text x="540" y="266" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--gold)" opacity=".85">principle → tools</text>
+
+          <line x1="505" y1="210" x2="505" y2="122" stroke="var(--gold)" stroke-width="1.3" stroke-dasharray="4 4" marker-end="url(#arrowd)" opacity=".8"/>
+          <text x="518" y="170" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--gold)" opacity=".85">reads principle_ids</text>
+          <text x="518" y="182" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--gold)" opacity=".85">+ static mechanism</text>
+
+          <line x1="650" y1="240" x2="1050" y2="122" stroke="var(--gold)" stroke-width="1.3" stroke-dasharray="4 4" marker-end="url(#arrowd)" opacity=".8"/>
+          <text x="850" y="200" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--gold)" opacity=".85">feeds "Tool coverage" section</text>
+        </svg>
+      </div>
+      <figcaption>One sweep, six stages. Every evaluator tags its own output with a principle and a mechanism; <code>coverage.py</code> just reads that registry backwards so any report can also answer "what else could I have run here?"</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ PIPELINE STAGES ============ -->
+<section class="block" id="pipeline">
+  <div class="wrap">
+    <div class="section-head"><h2>Pipeline stage reference</h2></div>
+    <p class="section-intro">What each non-evaluator module actually takes in and hands back. This is the part worth memorizing if you want to answer "how does X actually work" without opening the code.</p>
+
+    <div class="spec-grid">
+      <div class="spec">
+        <h3>Data loading</h3>
+        <span class="file">ethikit/data/loaders.py</span>
+        <dl>
+          <dt>In</dt><dd>nothing, or a seed — fetches UCI Adult via OpenML, falls back to a synthetic biased dataset offline</dd>
+          <dt>Out</dt><dd><code>RawData</code> (unsplit X/y) or a scaled <code>Dataset</code> (train/test split, <code>StandardScaler</code> fit on train only)</dd>
+          <dt>Read</dt><dd>The synthetic fallback has a <em>deliberately injected</em> bias so the fairness evaluator always has something real to catch — it's a test fixture, not a cop-out.</dd>
+        </dl>
+      </div>
+      <div class="spec">
+        <h3>Model zoo</h3>
+        <span class="file">ethikit/benchmark/models.py</span>
+        <dl>
+          <dt>In</dt><dd>nothing — a static registry</dd>
+          <dt>Out</dt><dd><code>{name: factory}</code> dict, grouped by family (linear / tree_based / instance_based / probabilistic / kernel)</dd>
+          <dt>Read</dt><dd>Stock scikit-learn only, by design — zero extra installs needed to run the base demo.</dd>
+        </dl>
+      </div>
+      <div class="spec">
+        <h3>Runner</h3>
+        <span class="file">ethikit/benchmark/runner.py</span>
+        <dl>
+          <dt>In</dt><dd>a <code>Dataset</code> + <code>{name: factory}</code></dd>
+          <dt>Out</dt><dd>a tidy <code>DataFrame</code> — one row per (model, evaluator, metric)</dd>
+          <dt>Read</dt><dd>Every evaluator call is wrapped in try/except — one broken tool becomes an <code>ERROR:...</code> row, never a crashed sweep.</dd>
+        </dl>
+      </div>
+      <div class="spec">
+        <h3>Scoring</h3>
+        <span class="file">ethikit/scoring/aggregate.py</span>
+        <dl>
+          <dt>In</dt><dd>the runner's raw DataFrame</dd>
+          <dt>Out</dt><dd><code>normalize()</code> → 0-1 columns; <code>principle_profile()</code> → model × principle; <code>pareto_front()</code> → non-dominated model list; <code>weighted_score()</code> → opt-in single ranking</dd>
+          <dt>Read</dt><dd>Nothing is ranked until <em>you</em> pass weights. No default weighting exists anywhere in this module.</dd>
+        </dl>
+      </div>
+      <div class="spec">
+        <h3>Coverage</h3>
+        <span class="file">ethikit/coverage.py</span>
+        <dl>
+          <dt>In</dt><dd>nothing — reads the live evaluator registry</dd>
+          <dt>Out</dt><dd><code>principle_to_tools()</code>, <code>tool_to_principles()</code>, <code>tool_info()</code> — the reverse of every evaluator's own <code>principle_ids</code></dd>
+          <dt>Read</dt><dd>Answers "which tool should I run for X" and "what does tool Y actually check" — before you run anything.</dd>
+        </dl>
+      </div>
+      <div class="spec">
+        <h3>Reports</h3>
+        <span class="file">ethikit/report/{report,model_card}.py</span>
+        <dl>
+          <dt>In</dt><dd>normalized scores + the Pareto front + raw per-metric rows</dd>
+          <dt>Out</dt><dd>one self-contained aggregate HTML report; one Model Card HTML per model</dd>
+          <dt>Read</dt><dd>Model Cards are the accountability artifact — hyperparameters, per-metric mechanism text, and which other tools could have scored the same principle.</dd>
+        </dl>
+      </div>
+      <div class="spec">
+        <h3>Repeated CV <span class="tag gold" style="margin-left:6px">phase 2</span></h3>
+        <span class="file">ethikit/benchmark/cv.py</span>
+        <dl>
+          <dt>In</dt><dd><code>RawData</code>, <code>n_splits</code>, <code>n_repeats</code></dd>
+          <dt>Out</dt><dd>the same tidy records, tagged with (repeat, fold) — a <em>distribution</em> per metric, not one point</dd>
+          <dt>Read</dt><dd>One split can make a model look best by luck. This is the fix — every score becomes many scores.</dd>
+        </dl>
+      </div>
+      <div class="spec">
+        <h3>Significance <span class="tag gold" style="margin-left:6px">phase 2</span></h3>
+        <span class="file">ethikit/scoring/significance.py</span>
+        <dl>
+          <dt>In</dt><dd>a model × sample score matrix (from CV or the meta-benchmark)</dd>
+          <dt>Out</dt><dd>Friedman χ², p-value, average ranks, Nemenyi pairwise p-values, a critical-difference diagram PNG</dd>
+          <dt>Read</dt><dd>p &lt; 0.05 means the ranking isn't noise. The CD diagram's horizontal bars show which models <em>aren't</em> significantly different.</dd>
+        </dl>
+      </div>
+      <div class="spec">
+        <h3>Meta-benchmark <span class="tag gold" style="margin-left:6px">phase 2</span></h3>
+        <span class="file">ethikit/benchmark/meta.py</span>
+        <dl>
+          <dt>In</dt><dd>a model zoo, optionally a list of PMLB dataset names</dd>
+          <dt>Out</dt><dd>one run per dataset, concatenated, plus a per-family "best in general" board averaged across all of them</dd>
+          <dt>Read</dt><dd>"Best model per family" becomes a claim about many datasets, not a one-dataset anecdote.</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EVALUATORS ============ -->
+<section class="block" id="evaluators">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>The 8 evaluators</h2>
+      <span class="tag red">3 marked <span class="mono">real attack</span> run genuine offensive techniques, not proxies</span>
+    </div>
+    <p class="section-intro">Every card below is a registered <code>Evaluator</code> subclass. Each one tags its output with a principle, an <code>InspectionTarget</code> (what part of the model/data it actually looks at), and a <code>mechanism</code> string explaining how it decides — shown here as the tool's own general description.</p>
+
+    <div class="eval-grid">
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Performance</h3><span class="file">evaluators/performance.py — axis: utility (not a principle)</span></div>
+          <div class="badges"><span class="pill">predictions</span></div>
+        </div>
+        <p class="mech">Standard sklearn metrics (accuracy / F1 / ROC-AUC, or R² / RMSE / MAE for regression) computed against the held-out test set.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd>Ordinary metric semantics — accuracy 0.76 means 76% correct. This axis is deliberately excluded from every principle profile so utility never gets silently averaged into ethics.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Fairness</h3><span class="file">evaluators/fairness.py — principle: fairness</span></div>
+          <div class="badges"><span class="pill">predictions</span><span class="pill">fairlearn → numpy fallback</span></div>
+        </div>
+        <p class="mech">Groups predictions by a declared sensitive attribute (e.g. sex) and compares outcome rates across groups — demographic parity + equalized-odds gaps for classification; group MAE/MSE gap for regression.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd>A "gap" metric near 0 means the groups are treated equally by that specific definition; it's flagged <code>higher_is_better=False</code> so normalization flips it correctly.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Explainability</h3><span class="file">evaluators/explainability.py — principle: explainability</span></div>
+          <div class="badges"><span class="pill">model_internals</span><span class="pill">SHAP → surrogate-tree fallback</span></div>
+        </div>
+        <p class="mech">SHAP permutation attributions on a sample of test rows; if SHAP fails, falls back to feature importances from a surrogate decision tree trained to mimic the model.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd>Surrogate fidelity near 1.0 means the explanation is trustworthy — the surrogate tree actually predicts what the real model predicts, not just something plausible-looking.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Robustness (noise)</h3><span class="file">evaluators/robustness.py — principle: safety</span></div>
+          <div class="badges"><span class="pill">behavior</span><span class="pill">dependency-free</span></div>
+        </div>
+        <p class="mech">Adds Gaussian noise (σ × per-feature std) to test features, repeated 5×, and measures how often the prediction stays the same.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd>Stability of 0.95 means predictions flipped for only 5% of rows under mild random jitter — a baseline, "does this fall over from ordinary noise" check.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard real">
+        <div class="eh">
+          <div><h3>Membership Inference <span class="tag red" style="margin-left:8px">real attack</span></h3><span class="file">evaluators/privacy.py — principle: privacy — phase 3</span></div>
+          <div class="badges"><span class="pill">behavior</span></div>
+        </div>
+        <p class="mech">A genuine black-box attack (Yeom et al. 2018): extracts a confidence/loss feature per row, balances known-member (train) vs known-non-member (test) counts, and fits a cross-validated LogisticRegression attacker to tell them apart. Reports out-of-fold attack AUC and "advantage."</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>advantage = 0.0</code> means the attack is no better than guessing — no detectable leakage. Higher means an attacker really can tell training rows from held-out rows just by how confidently the model predicts them.</dd>
+        </dl>
+        <div class="evidence">Measured: an unconstrained <code>random_forest</code> (200 trees, no depth cap) scored <b>advantage = 0.325</b> — clearly memorizing. <code>logistic_regression</code> scored <b>0.000</b> on the same data, same split.</div>
+      </div>
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Giskard scan</h3><span class="file">evaluators/giskard_scan.py — principles: fairness, safety</span></div>
+          <div class="badges"><span class="pill">behavior</span><span class="pill">classification only</span></div>
+        </div>
+        <p class="mech">Runs Giskard's automated scanner over a sample of test rows: loss-guided slicing auto-discovers underperforming subgroups (→ fairness); feature perturbation + protected-attribute swaps flag unstable predictions (→ safety). Issues are severity-weighted and summed.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>giskard_issue_score</code> is <code>higher_is_better=False</code> — it's a weighted count of real issues the scanner actually found, not a normalized rate. 0 means clean.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard real">
+        <div class="eh">
+          <div><h3>Adversarial Robustness <span class="tag red" style="margin-left:8px">real attack</span></h3><span class="file">evaluators/art_robustness.py — principle: safety — phase 3</span></div>
+          <div class="badges"><span class="pill">behavior</span><span class="pill">classification only</span></div>
+        </div>
+        <p class="mech">A real black-box evasion attack (HopSkipJump, Chen et al. 2019, via the Adversarial Robustness Toolbox) treats the model as a label-only oracle — no gradients, exactly how an outside attacker would query a deployed model — and searches for the smallest perturbation that flips a prediction.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>adversarial_robustness</code> = 1 − flip rate within a tight query budget. <code>adversarial_perturbation_size</code> (median, among successful flips) is often more informative — larger means the attacker needed a bigger, more detectable change.</dd>
+        </dl>
+        <div class="evidence">On a 4-feature synthetic dataset the attack flips <em>every</em> model within budget (low-dimensional boundaries are easy to cross) — but perturbation size still separates them clearly: 0.235 for <code>random_forest</code> vs 0.764 for <code>gradient_boosting</code>.</div>
+      </div>
+
+      <div class="evalcard real">
+        <div class="eh">
+          <div><h3>Drift Detection <span class="tag red" style="margin-left:8px">real attack</span></h3><span class="file">evaluators/drift.py — principle: safety — phase 3</span></div>
+          <div class="badges"><span class="pill">data</span><span class="pill">behavior</span></div>
+        </div>
+        <p class="mech">Manufactures a synthetic covariate shift, then runs Alibi Detect's real <code>TabularDrift</code> statistical test (per-feature Kolmogorov-Smirnov, Bonferroni-corrected) — checking both whether it correctly flags the shifted set <em>and</em> correctly leaves the unshifted set alone — plus how much the model's own accuracy drops under that shift.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>drift_detection_score</code> of 1.0 means the statistical test got both calls right. <code>performance_retention_under_drift</code> close to 1.0 means the model degrades gracefully once drift is present.</dd>
+        </dl>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ READING OUTPUT ============ -->
+<section class="block" id="reading">
+  <div class="wrap">
+    <div class="section-head"><h2>Reading any output, in general</h2></div>
+    <p class="section-intro">Four rules cover every number this project ever produces, in every report, chart, and CSV.</p>
+
+    <div class="decoder">
+      <div class="dcard"><span class="k">1 = always best</span><p><code>normalize()</code> min-max scales every metric to [0,1] and flips the direction when <code>higher_is_better=False</code>, so you never have to remember which way a raw metric points. A radar chart spoke of 1.0 is always the best result in that run, on that principle, full stop.</p></div>
+      <div class="dcard"><span class="k">Scores are relative, not absolute</span><p>1.0 means "best among the models actually compared in this run" — not "perfect." Adding a worse model to the sweep can push everyone else's normalized scores up without anything about them changing.</p></div>
+      <div class="dcard"><span class="k">mechanism is never empty</span><p>Every <code>EvalResult</code> carries a mandatory <code>mechanism</code> string with this run's real numbers — sample size, backend, groups compared. If a report shows a value with no explanation, that's a bug, not a design choice.</p></div>
+      <div class="dcard"><span class="k">Ranking is opt-in</span><p><code>weighted_score()</code> only ever runs once a human supplies explicit weights. No default weighting scheme exists anywhere — the value judgement has to be visible and attributable to a person.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EVIDENCE ============ -->
+<section class="block" id="evidence">
+  <div class="wrap">
+    <div class="section-head"><h2>Rigor evidence, if asked</h2></div>
+    <p class="section-intro">Keep these three numbers in your back pocket — they're the fastest way to answer "how do I know this isn't just toy metrics."</p>
+    <div class="tblwrap">
+      <table>
+        <tr><th>Claim</th><th>Evidence</th><th>Where it lives</th></tr>
+        <tr><td>Rankings are statistically real, not noise</td><td>Friedman test on accuracy across 15 CV folds: <code>p = 1.65e-11</code> — average ranks from <code>logistic_regression</code> (best, 1.33) to <code>decision_tree</code> (worst, 6.13), with a critical-difference diagram showing which pairs actually differ</td><td><code>examples/run_phase2_demo.py</code></td></tr>
+        <tr><td>"Best model" isn't a one-dataset anecdote</td><td>480 rows across 10 PMLB datasets; per-family winner computed as a <em>mean</em> across all of them, not one lucky split</td><td><code>ethikit.benchmark.meta</code></td></tr>
+        <tr><td>Privacy risk is a real, differentiated signal</td><td>Membership-inference advantage ranged 0.000 (logistic regression) → 0.325 (unconstrained random forest) on identical data — the attack tracks actual overfitting, not noise</td><td><code>examples/run_phase3_demo.py</code></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ROADMAP ============ -->
+<section class="block" id="roadmap">
+  <div class="wrap">
+    <div class="section-head"><h2>What's next</h2></div>
+    <p class="section-intro"><strong>Phase 4 — deep learning &amp; LLMs</strong> is the only item left on the original roadmap, and it's a bigger jump than phases 1-3: every evaluator so far assumes a sklearn-style tabular model with <code>.fit()</code>/<code>.predict()</code> over numpy arrays. Extending to DL (Captum, a PyTorch/TF adapter) or LLMs (DeepEval/DeepTeam, or Giskard's own LLM scan — already a dependency here) means deciding whether <code>EvalContext</code> grows a non-tabular variant or gets a parallel type entirely. Good, deliberately open question for mentor input.</p>
+  </div>
+</section>
+
+<!-- ============ COMMANDS ============ -->
+<section class="block" id="commands" style="border-bottom:none">
+  <div class="wrap">
+    <div class="section-head"><h2>Commands, for the pre-demo checklist</h2></div>
+    <div class="cmdlist">
+      <div class="cmdrow"><code>pip install -r requirements.txt</code><span>or <code>pip install -e ".[full,phase2,phase3]"</code> — run once, well before the room fills up</span></div>
+      <div class="cmdrow"><code>streamlit run demo/app.py</code><span>the live UI — open this tab first and leave it running</span></div>
+      <div class="cmdrow"><code>python -m examples.run_demo</code><span>generates <code>ethikit_report.html</code> + all Model Cards — your static fallback, run this beforehand too</span></div>
+      <div class="cmdrow"><code>python -m examples.run_phase2_demo</code><span>CV, significance testing, meta-benchmark — the rigor numbers above</span></div>
+      <div class="cmdrow"><code>python -m examples.run_phase3_demo</code><span>the three real attacks, printed with their mechanism text inline</span></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Part of the ethikit docs set, alongside <a href="proposal.html">the project proposal</a> and <a href="understanding.html">the technical companion</a> — not a substitute for reading the code, just a faster way in.</div>
+</footer>
+
+</body>
+</html>
