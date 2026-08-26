@@ -26,12 +26,22 @@ backend used, groups compared), what the tool did internally to produce that num
 see any Model Card's Quantitative Analysis table, or a tool's static `Evaluator.mechanism`
 via `ethikit.coverage.tool_info()`.
 
+A third thing: one split is one anecdote. `run_demo.py`'s single train/test split can make
+a model look best just because it got a lucky test slice -- `ethikit.benchmark.cv` reruns
+the same battery across repeated stratified folds so every score becomes a *distribution*,
+and `ethikit.scoring.significance` runs a Friedman test (+ Nemenyi post-hoc, + critical-
+difference diagram) so "model A beats model B" is a hypothesis test, not eyeballing two
+means. `ethikit.benchmark.meta` runs the same idea across *multiple datasets* (via PMLB),
+so "best model per family, in general" is an aggregate finding, not a one-dataset story.
+See `examples/run_phase2_demo.py`.
+
 ## Quick start
 
 ```bash
-pip install -r requirements.txt        # or: pip install -e ".[full]"
-python -m examples.run_demo            # runs offline on synthetic data
+pip install -r requirements.txt        # or: pip install -e ".[full,phase2]"
+python -m examples.run_demo            # single-dataset demo; runs offline on synthetic data
 streamlit run demo/app.py              # interactive UI
+python -m examples.run_phase2_demo     # generalization: CV, significance, meta-benchmark
 ```
 
 The demo works with **zero network** (synthetic biased dataset) and upgrades to the real
@@ -56,17 +66,27 @@ ethikit/
     privacy.py           train/test-gap leakage proxy (membership inference later)
     giskard_scan.py       unified scan (subgroup performance bias -> fairness, perturbation
                           robustness -> safety); ART / data-leakage scan later
-  data/loaders.py        Adult (+ synthetic fallback) with sensitive attribute
+  data/loaders.py        Adult (+ synthetic fallback), RawData + split_dataset() so a
+                          single split and repeated CV scale/split identically
   benchmark/
-    models.py            model zoo grouped by family (linear/tree/kernel/…)
+    models.py            classifier + regressor zoo grouped by family (linear/tree/kernel/…)
     runner.py            train sweep -> run evaluator battery -> tidy records
-  scoring/aggregate.py   normalize -> profile -> Pareto -> optional weighted score
+    cv.py                 Phase 2: repeated stratified K-fold -> a score DISTRIBUTION
+                          per model instead of one split's point estimate
+    meta.py                Phase 2: the same sweep across many PMLB datasets, aggregated,
+                          for "best model per family in general" (not one dataset)
+  scoring/
+    aggregate.py          normalize -> profile -> Pareto -> optional weighted score
+    significance.py        Phase 2: Friedman + Nemenyi + critical-difference diagram,
+                          so "model A beats model B" is backed by a hypothesis test
   report/
     report.py            self-contained aggregate HTML report
     model_card.py         one Model Card per model (schema-compliant HTML;
                           model-card-toolkit sidecar JSON when installable)
 demo/app.py              Streamlit UI (Plotly radar + per-model Model Card viewer)
-examples/run_demo.py     end-to-end CLI demo
+examples/
+  run_demo.py            single-dataset, single-split end-to-end CLI demo
+  run_phase2_demo.py      CV + significance + meta-benchmark + regression fairness
 ```
 
 ## Extending it (the whole point)

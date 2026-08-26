@@ -8,12 +8,15 @@ from __future__ import annotations
 
 from typing import Callable, Dict
 
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import (
+    GradientBoostingClassifier, GradientBoostingRegressor,
+    RandomForestClassifier, RandomForestRegressor,
+)
+from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.naive_bayes import GaussianNB
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 # family -> {model_name: factory}
 CLASSIFIERS: Dict[str, Dict[str, Callable]] = {
@@ -36,17 +39,43 @@ CLASSIFIERS: Dict[str, Dict[str, Callable]] = {
     },
 }
 
+# family -> {model_name: factory}, mirroring CLASSIFIERS' families for regression
+# (Phase 2: exercises FairnessEvaluator's group-MAE/MSE branch).
+REGRESSORS: Dict[str, Dict[str, Callable]] = {
+    "linear": {
+        "ridge": lambda: Ridge(),
+    },
+    "tree_based": {
+        "decision_tree_reg": lambda: DecisionTreeRegressor(max_depth=6, random_state=0),
+        "random_forest_reg": lambda: RandomForestRegressor(n_estimators=200, random_state=0),
+        "gradient_boosting_reg": lambda: GradientBoostingRegressor(random_state=0),
+    },
+    "instance_based": {
+        "knn_reg": lambda: KNeighborsRegressor(),
+    },
+}
+
 
 def flat_classifiers() -> Dict[str, Callable]:
-    """{model_name: factory} across all families."""
+    """{model_name: factory} across all classifier families."""
+    return _flatten(CLASSIFIERS)
+
+
+def flat_regressors() -> Dict[str, Callable]:
+    """{model_name: factory} across all regressor families."""
+    return _flatten(REGRESSORS)
+
+
+def _flatten(registry: Dict[str, Dict[str, Callable]]) -> Dict[str, Callable]:
     out = {}
-    for family in CLASSIFIERS.values():
+    for family in registry.values():
         out.update(family)
     return out
 
 
 def family_of(model_name: str) -> str:
-    for fam, models in CLASSIFIERS.items():
-        if model_name in models:
-            return fam
+    for registry in (CLASSIFIERS, REGRESSORS):
+        for fam, models in registry.items():
+            if model_name in models:
+                return fam
     return "unknown"

@@ -23,9 +23,10 @@ streamlit>=1.30
 plotly>=5.18
 matplotlib>=3.7        # backs pandas Styler.background_gradient in the leaderboard table
 
-# Phase 2+ (generalization / meta-benchmark)
-# openml>=0.14
-# scipy>=1.11          # significance testing (Friedman / Nemenyi)
+# Phase 2 (generalization / meta-benchmark / significance)
+pmlb>=1.0               # meta-benchmark dataset suite (github-hosted, no API key)
+scipy>=1.11              # Friedman test (already pulled in transitively by giskard)
+scikit-posthocs>=0.9    # Nemenyi post-hoc + critical-difference diagram
 
 # Phase 3 (privacy) / Phase 4 (deep learning + LLMs)
 # tensorflow-privacy   # DP-SGD + membership inference
