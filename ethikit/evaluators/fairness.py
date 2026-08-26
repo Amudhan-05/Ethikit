@@ -29,6 +29,15 @@ class FairnessEvaluator(Evaluator):
     name = "fairness"
     principle_ids = ["fairness", "inclusiveness"]
     supports = [TaskType.CLASSIFICATION]  # extend to regression via group MAE later
+    mechanism = (
+        "Groups the model's test-set predictions by a declared sensitive attribute "
+        "and compares outcome rates across groups -- selection rate (demographic "
+        "parity), true/false-positive rate gap (equalized odds) -- using "
+        "fairlearn.metrics.MetricFrame, or the equivalent numpy computation if "
+        "fairlearn isn't installed. Inspects PREDICTIONS only: it never looks at "
+        "the model's weights or training process, so it can flag *that* a gap "
+        "exists between groups but not *why*."
+    )
 
     def applies_to(self, ctx: EvalContext) -> bool:
         return (
@@ -40,22 +49,29 @@ class FairnessEvaluator(Evaluator):
         y_true = np.asarray(ctx.dataset.y_test)
         y_pred = np.asarray(ctx.y_pred)
         groups = np.asarray(ctx.dataset.sensitive_test)
+        group_labels = sorted(str(g) for g in np.unique(groups))
 
         if _try_fairlearn():
             dpd, eod, dir_ = self._via_fairlearn(y_true, y_pred, groups)
-            backend = "fairlearn"
+            backend = "fairlearn.metrics.MetricFrame"
         else:
             dpd, eod, dir_ = self._via_numpy(y_true, y_pred, groups)
-            backend = "numpy-fallback"
+            backend = "numpy fallback (equivalent hand-rolled computation)"
 
-        details = {"backend": backend, "sensitive": ctx.dataset.sensitive_name}
+        mechanism = (
+            f"Computed via {backend}, grouping {len(y_true)} test predictions by "
+            f"sensitive attribute '{ctx.dataset.sensitive_name}' into "
+            f"{len(group_labels)} groups ({', '.join(group_labels)})."
+        )
+        details = {"backend": backend, "sensitive": ctx.dataset.sensitive_name,
+                   "groups": group_labels}
         return [
             EvalResult(self.name, "fairness", InspectionTarget.PREDICTIONS,
-                       "demographic_parity_diff", dpd, False, details),
+                       "demographic_parity_diff", dpd, False, mechanism, details),
             EvalResult(self.name, "fairness", InspectionTarget.PREDICTIONS,
-                       "equalized_odds_diff", eod, False, details),
+                       "equalized_odds_diff", eod, False, mechanism, details),
             EvalResult(self.name, "inclusiveness", InspectionTarget.PREDICTIONS,
-                       "min_group_selection_rate", dir_, True, details),
+                       "min_group_selection_rate", dir_, True, mechanism, details),
         ]
 
     # --- fairlearn path -----------------------------------------------------

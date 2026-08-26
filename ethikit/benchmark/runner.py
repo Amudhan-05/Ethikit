@@ -53,5 +53,6 @@ def run_benchmark(dataset: Dataset,
                     "principle": (ev.principle_ids or ["?"])[0], "target": "error",
                     "metric": f"ERROR:{type(exc).__name__}", "value": float("nan"),
                     "higher_is_better": True,
+                    "mechanism": f"{ev.name} raised {type(exc).__name__}: {exc}",
                 })
     return pd.DataFrame.from_records(records)

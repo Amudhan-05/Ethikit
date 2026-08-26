@@ -18,6 +18,7 @@ from ethikit.data import load_adult, make_synthetic_fairness_dataset
 from ethikit.benchmark import run_benchmark, CLASSIFIERS, family_of
 from ethikit.scoring import normalize, objective_matrix, pareto_front, principle_profile, weighted_score
 from ethikit.report import render_model_cards
+from ethikit.coverage import principle_to_tools, tool_info
 
 def plotly_radar(radar: pd.DataFrame) -> pgo.Figure:
     """One closed polygon per model over the per-principle profile columns."""
@@ -39,6 +40,18 @@ def plotly_radar(radar: pd.DataFrame) -> pgo.Figure:
 st.set_page_config(page_title="Ethikit", layout="wide")
 st.title("Ethikit — ethical AI model evaluator")
 st.caption("Open-source orchestrator: one dataset in, an ethics profile per model out.")
+
+with st.expander("Tool & principle coverage — which tool addresses which principle, and how"):
+    st.caption("Reverse of each evaluator's own principle_ids: pick a principle, see every "
+              "registered tool that speaks to it and what it actually does internally to "
+              "produce that signal. Per-model runs carry their own run-specific mechanism "
+              "text too — see each Model Card's Quantitative Analysis table.")
+    cov_rows = [
+        {"principle": pid, "tool": name, "mechanism": tool_info(name)["mechanism"]}
+        for pid, tools in sorted(principle_to_tools().items())
+        for name in tools
+    ]
+    st.dataframe(pd.DataFrame(cov_rows), use_container_width=True, hide_index=True)
 
 # --- sidebar controls ------------------------------------------------------
 with st.sidebar:

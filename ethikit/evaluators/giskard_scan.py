@@ -99,6 +99,18 @@ class GiskardEvaluator(Evaluator):
     name = "giskard"
     principle_ids = ["fairness", "safety"]
     supports = [TaskType.CLASSIFICATION]  # giskard.Model wiring below is classification-only
+    mechanism = (
+        "Runs Giskard's automated scanner over a random sample of test rows, "
+        "treating the model as a black-box predict_proba function: "
+        "PerformanceBiasDetector auto-discovers data slices via loss-guided "
+        "slicing and flags ones whose performance metric is significantly worse "
+        "than the global average (-> fairness); NumericalPerturbationDetector and "
+        "EthicalBiasDetector perturb feature values (noise, rescaling, "
+        "protected-attribute swaps) and flag high failure rates (-> safety). "
+        "Issues are weighted by severity (major=3/medium=2/minor=1) and summed "
+        "per principle bucket. Deliberately skips the data-leakage detector -- "
+        "see this module's docstring."
+    )
 
     def __init__(self, sample_size: int = 300, seed: int = 0):
         self.sample_size = sample_size
@@ -158,11 +170,17 @@ class GiskardEvaluator(Evaluator):
         results = []
         for principle in self.principle_ids:
             data = buckets.get(principle, {"weight": 0.0, "issues": []})
+            n_issues = len(data["issues"])
+            detectors = sorted(set(i["detector"] for i in data["issues"])) or ["none triggered"]
+            mechanism = (
+                f"Giskard scan (performance + robustness categories) over {n} sampled "
+                f"test rows: {n_issues} issue(s) found for '{principle}' via "
+                f"{', '.join(detectors)}; severity-weighted score = {data['weight']:.1f}."
+            )
             results.append(EvalResult(
                 self.name, principle, InspectionTarget.BEHAVIOR, "giskard_issue_score",
-                float(data["weight"]), False,
-                {"n_issues": len(data["issues"]), "issues": data["issues"][:5],
-                 "sample_size": n},
+                float(data["weight"]), False, mechanism,
+                {"n_issues": n_issues, "issues": data["issues"][:5], "sample_size": n},
             ))
         return results
 

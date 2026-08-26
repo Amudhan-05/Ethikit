@@ -21,6 +21,14 @@ from .base import Evaluator, register
 class RobustnessEvaluator(Evaluator):
     name = "robustness"
     principle_ids = ["safety"]
+    mechanism = (
+        "Adds Gaussian noise (sigma x per-feature standard deviation) to every "
+        "numeric test feature, repeated several times, and measures the fraction "
+        "of predictions that stay the same (classification) or the relative "
+        "change in predicted value (regression). Inspects BEHAVIOR under input "
+        "perturbation only -- it says nothing about *why* a model is or isn't "
+        "stable, and never touches categorical/text features."
+    )
 
     def __init__(self, sigma: float = 0.1, n_repeats: int = 5, seed: int = 0):
         self.sigma = sigma
@@ -45,10 +53,17 @@ class RobustnessEvaluator(Evaluator):
                 agreements.append(float(max(0.0, 1.0 - rel)))
 
         stability = float(np.mean(agreements))
+        mechanism = (
+            f"Perturbed all {X.shape[1]} numeric features of {len(X)} test rows with "
+            f"N(0, {self.sigma}*feature_std) noise, repeated {self.n_repeats}x, and "
+            f"measured prediction agreement against the unperturbed baseline each time "
+            f"(mean stability = {stability:.4f} across the {self.n_repeats} repeats)."
+        )
         return [
             EvalResult(self.name, "safety", InspectionTarget.BEHAVIOR,
-                       "perturbation_stability", stability, True,
-                       {"sigma": self.sigma, "n_repeats": self.n_repeats}),
+                       "perturbation_stability", stability, True, mechanism,
+                       {"sigma": self.sigma, "n_repeats": self.n_repeats,
+                        "per_repeat_agreement": [round(a, 4) for a in agreements]}),
         ]
 
 

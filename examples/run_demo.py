@@ -12,12 +12,16 @@ from ethikit.data import load_adult
 from ethikit.benchmark import run_benchmark, flat_classifiers, family_of
 from ethikit.scoring import leaderboard, normalize, objective_matrix, pareto_front, principle_profile
 from ethikit.report import render_html, render_model_cards
+from ethikit.coverage import coverage_table
 
 pd.set_option("display.width", 140)
 pd.set_option("display.max_columns", 20)
 
 
 def main():
+    print("=== Tool & principle coverage (which tool addresses which principle, and how) ===")
+    print(coverage_table())
+
     ds = load_adult()
     print(f"\nDataset: {ds.name}  |  sensitive attribute: {ds.sensitive_name}")
     print(f"train={len(ds.y_train)}  test={len(ds.y_test)}\n")

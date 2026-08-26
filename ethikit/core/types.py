@@ -42,13 +42,24 @@ class EvalContext:
 
 @dataclass
 class EvalResult:
-    """One standardised measurement, tagged so it can be aggregated and scored."""
+    """One standardised measurement, tagged so it can be aggregated and scored.
+
+    `mechanism` is the run-specific, human-readable explanation of *how* this
+    particular value was produced -- which algorithm/library call, over what
+    slice of the data or model, with what actual parameters (sample sizes,
+    backend used, groups compared, ...). It exists so a score is never a black
+    box: given any row in the pipeline you can trace it back to a concrete
+    computation, not just a number. Every evaluator must set it. Contrast with
+    `details`, which stays free-form structured data for anything that doesn't
+    fit in one sentence (e.g. per-feature attributions, per-issue descriptions).
+    """
     evaluator: str
     principle_id: str
     target: InspectionTarget
     metric: str
     value: float
     higher_is_better: bool
+    mechanism: str = ""
     details: Dict[str, Any] = field(default_factory=dict)
 
     def as_record(self, model_name: str) -> Dict[str, Any]:
@@ -60,4 +71,5 @@ class EvalResult:
             "metric": self.metric,
             "value": self.value,
             "higher_is_better": self.higher_is_better,
+            "mechanism": self.mechanism,
         }

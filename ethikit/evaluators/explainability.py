@@ -31,26 +31,54 @@ def _has_shap():
 class ExplainabilityEvaluator(Evaluator):
     name = "explainability"
     principle_ids = ["explainability", "transparency"]
+    mechanism = (
+        "Two independent, model-agnostic signals, both treating the model as a "
+        "black-box predict()/predict_proba() function -- neither inspects real "
+        "internal weights: (1) surrogate fidelity -- a depth-3 decision tree is "
+        "trained to mimic the model's own predictions; how accurately that tiny, "
+        "human-readable tree reproduces them is the fidelity score. (2) feature "
+        "attribution -- when SHAP is installed, mean |SHAP value| per feature from "
+        "a permutation-based explainer run over a random sample against a "
+        "background sample; falls back to the surrogate tree's own "
+        "feature_importances_ if SHAP errors or isn't installed."
+    )
 
     def evaluate(self, ctx: EvalContext) -> List[EvalResult]:
         X_test = ctx.dataset.X_test
         y_pred = np.asarray(ctx.y_pred)
         fidelity, top = self._surrogate_fidelity(ctx, X_test, y_pred)
         backend = "permutation_importance"
+        shap_meta = None
 
         if _has_shap():
             try:
-                shap_top = self._shap_top_features(ctx, X_test)
+                shap_top, shap_meta = self._shap_top_features(ctx, X_test)
                 if shap_top:
                     top = shap_top
                     backend = "shap"
             except Exception:
                 pass  # keep the surrogate-derived ranking if SHAP fails on this model
 
+        if backend == "shap":
+            mechanism = (
+                f"SHAP permutation explainer (max_evals={shap_meta['max_evals']}) over "
+                f"{shap_meta['sample_size']} sampled test rows against a background of "
+                f"{shap_meta['background_size']} rows, ranked by mean |SHAP value|; "
+                f"surrogate fidelity from a depth-3 decision tree trained on "
+                f"{len(y_pred)} test predictions."
+            )
+        else:
+            mechanism = (
+                f"SHAP unavailable or failed on this model -- fell back to a depth-3 "
+                f"decision tree trained to mimic {len(y_pred)} test predictions; "
+                f"fidelity = how often the tree agrees with the model, features ranked "
+                f"by the tree's own feature_importances_."
+            )
+
         details = {"top_features": top, "attribution_backend": backend}
         return [
             EvalResult(self.name, "explainability", InspectionTarget.MODEL_INTERNALS,
-                       "surrogate_fidelity", fidelity, True, details),
+                       "surrogate_fidelity", fidelity, True, mechanism, details),
         ]
 
     def _shap_top_features(self, ctx, X_test, sample_size: int = 25, background_size: int = 15):
@@ -83,7 +111,10 @@ class ExplainabilityEvaluator(Evaluator):
 
         names = ctx.dataset.feature_names or [f"f{i}" for i in range(Xt.shape[1])]
         order = np.argsort(mean_abs)[::-1][:5]
-        return [(names[i], round(float(mean_abs[i]), 4)) for i in order if mean_abs[i] > 0]
+        top = [(names[i], round(float(mean_abs[i]), 4)) for i in order if mean_abs[i] > 0]
+        meta = {"sample_size": len(sample), "background_size": len(background),
+                "max_evals": max_evals}
+        return top, meta
 
     def _surrogate_fidelity(self, ctx, X_test, y_pred):
         from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor

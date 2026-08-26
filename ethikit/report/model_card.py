@@ -18,10 +18,12 @@ from __future__ import annotations
 
 import html
 import os
+from collections import defaultdict
 from typing import Dict, List, Optional
 
 import pandas as pd
 
+from .. import coverage as coverage_mod
 from .. import principles as principles_mod
 from ..benchmark.models import family_of, flat_classifiers
 
@@ -51,6 +53,23 @@ def _governance_only_principles() -> List[str]:
     return [p.name for p in principles_mod.PRINCIPLES if not p.tool_addressable]
 
 
+def _tool_coverage_for_card(metrics: List[Dict[str, object]]) -> List[Dict[str, object]]:
+    """For every principle this model was actually scored on: which tool(s) ran
+    here, and which other registered tool(s) also address that principle but
+    didn't contribute a row -- the "or you could use..." second-opinion list."""
+    used_by_principle: Dict[str, set] = defaultdict(set)
+    for m in metrics:
+        used_by_principle[m["principle"]].add(m["evaluator"])
+    p2t = coverage_mod.principle_to_tools()
+    rows = []
+    for principle in sorted(used_by_principle):
+        used = sorted(used_by_principle[principle])
+        available = p2t.get(principle, [])
+        other = [t for t in available if t not in used]
+        rows.append({"principle": principle, "used": used, "other": other})
+    return rows
+
+
 def _card_data(model_name: str, dataset_name: str, sensitive_name: Optional[str],
               raw: pd.DataFrame, profile_row: "pd.Series", in_pareto: bool) -> Dict[str, object]:
     rows = raw[(raw["model"] == model_name) & (raw["target"] != "error")]
@@ -58,7 +77,8 @@ def _card_data(model_name: str, dataset_name: str, sensitive_name: Optional[str]
         {"evaluator": r.evaluator, "principle": r.principle, "target": r.target,
          "metric": r.metric,
          "value": None if pd.isna(r.value) else round(float(r.value), 4),
-         "higher_is_better": bool(r.higher_is_better)}
+         "higher_is_better": bool(r.higher_is_better),
+         "mechanism": getattr(r, "mechanism", "") or ""}
         for r in rows.itertuples()
     ]
     return {
@@ -73,6 +93,7 @@ def _card_data(model_name: str, dataset_name: str, sensitive_name: Optional[str]
         },
         "pareto_optimal": in_pareto,
         "governance_only_principles": _governance_only_principles(),
+        "tool_coverage": _tool_coverage_for_card(metrics),
     }
 
 
@@ -111,8 +132,10 @@ th,td{padding:6px 10px;border-bottom:1px solid #e7e3da;text-align:left}
 th{color:#6b7683;font-weight:600}
 .pill{display:inline-block;background:#e6f0eb;color:#2f5f4e;border-radius:20px;padding:3px 10px;margin:2px 3px;font-size:12px}
 .pill.gov{background:#f3ece0;color:#7a5c2a}
+.pill.other{background:#eef1f5;color:#3d4f66}
 .note{background:#fff6e9;border-left:3px solid #e0a54b;padding:10px 14px;font-size:13px;color:#5c4a2a;margin-top:8px}
 code{background:#f2efe8;padding:1px 5px;border-radius:4px;font-size:12px}
+.mech{max-width:340px;white-space:normal;color:#4a5560;font-size:12px}
 """
 
 
@@ -129,9 +152,17 @@ def _render_card_html(card: Dict[str, object]) -> str:
         f"<tr><td>{esc(m['principle'])}</td><td>{esc(m['evaluator'])}</td>"
         f"<td>{esc(m['metric'])}</td><td>{esc(m['target'])}</td>"
         f"<td>{'-' if m['value'] is None else m['value']}</td>"
-        f"<td>{'higher' if m['higher_is_better'] else 'lower'} is better</td></tr>"
+        f"<td>{'higher' if m['higher_is_better'] else 'lower'} is better</td>"
+        f"<td class='mech'>{esc(m['mechanism']) or '-'}</td></tr>"
         for m in card["metrics"]
-    ) or "<tr><td colspan='6'>no results</td></tr>"
+    ) or "<tr><td colspan='7'>no results</td></tr>"
+
+    coverage_rows = "".join(
+        f"<tr><td>{esc(c['principle'])}</td>"
+        f"<td>{''.join(f'<span class=\"pill\">{esc(t)}</span>' for t in c['used'])}</td>"
+        f"<td>{''.join(f'<span class=\"pill other\">{esc(t)}</span>' for t in c['other']) or '-'}</td></tr>"
+        for c in card["tool_coverage"]
+    ) or "<tr><td colspan='3'>no results</td></tr>"
 
     profile_rows = "".join(
         f"<tr><td>{esc(k)}</td><td>{'-' if v is None else v}</td></tr>"
@@ -168,12 +199,22 @@ tool-addressable ethics principles before a human makes a deployment decision. N
 validated for production use on any real population.</p>
 
 <h2>Quantitative analysis</h2>
+<p style="font-size:13px;color:#6b7683">The Mechanism column is the specific computation behind
+each number in <em>this run</em> -- not a black-box score. See "Tool coverage" below for
+alternative tools you could reach for on the same principle.</p>
 <table><tr><th>Principle</th><th>Evaluator</th><th>Metric</th><th>Inspects</th>
-<th>Value</th><th>Direction</th></tr>{metric_rows}</table>
+<th>Value</th><th>Direction</th><th>Mechanism (this run)</th></tr>{metric_rows}</table>
 
 <h2>Per-principle profile (0-1, 1 = best among candidates in this run)</h2>
 <table><tr><th>Principle</th><th>Normalized score</th></tr>{profile_rows}</table>
 <p style="font-size:13px;color:#6b7683">{pareto_line}</p>
+
+<h2>Tool coverage</h2>
+<p style="font-size:13px;color:#6b7683">Which registered tool(s) actually scored this model on
+each principle above (green), and which other registered tool(s) also address that principle
+but weren't the source of these numbers (grey) -- a second opinion is one <code>register()</code>
+call away. Full reverse map: <code>ethikit.coverage.principle_to_tools()</code>.</p>
+<table><tr><th>Principle</th><th>Used here</th><th>Also available</th></tr>{coverage_rows}</table>
 
 <h2>Ethical considerations</h2>
 <p>Metrics above cover only <i>tool-addressable</i> principles -- the ones a library can

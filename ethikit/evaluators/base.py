@@ -20,6 +20,12 @@ class Evaluator(ABC):
     principle_ids: List[str] = []
     #: which task types it supports
     supports: List[TaskType] = [TaskType.CLASSIFICATION, TaskType.REGRESSION]
+    #: general, run-independent explanation of how this tool decides what it
+    #: decides (which algorithm, what part of the model/data it looks at).
+    #: This is the static counterpart to EvalResult.mechanism, which carries
+    #: the same idea but filled in with this particular run's actual numbers.
+    #: Powers ethikit.coverage's reverse principle -> tool lookup.
+    mechanism: str = "(no mechanism description registered)"
 
     def available(self) -> bool:
         """Override to return False when optional dependencies are missing."""
