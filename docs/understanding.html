@@ -5,42 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit Internals</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="theme.css">
 <style>
-:root{
-  --bg:#f6f3ea; --bg-raised:#fffdf8; --bg-sunken:#efe9db;
-  --ink:#1b1f19; --ink-dim:#5c6259; --ink-faint:#8a8f80;
-  --rule:#ddd6c4; --rule-strong:#c7bea6;
-  --accent:#2c6a4f; --accent-ink:#ffffff; --accent-soft:#e2eee5; --accent-rule:#a8cdb7;
-  --gold:#93691c; --gold-soft:#f3e8cd; --gold-rule:#dcc27f;
-  --red:#a04a35; --red-soft:#f4e2da; --red-rule:#dba28d;
-  --blue:#3d6a8f; --blue-soft:#e6eef4; --blue-rule:#aec7db;
-  --mono-surface:#eeead9; --mono-ink:#3c4535;
-  --font-display:"Big Shoulders",'Arial Narrow',sans-serif;
-  --font-body:"Public Sans",-apple-system,"Segoe UI",sans-serif;
-  --font-mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#12160f; --bg-raised:#1a1f17; --bg-sunken:#0d1109;
-    --ink:#eae6d8; --ink-dim:#a3a894; --ink-faint:#767c68;
-    --rule:#2c3226; --rule-strong:#3c4432;
-    --accent:#74c39a; --accent-ink:#0c1710; --accent-soft:#1c2b21; --accent-rule:#33513f;
-    --gold:#d9b354; --gold-soft:#2b2513; --gold-rule:#4a3d1c;
-    --red:#d98a70; --red-soft:#2c1e17; --red-rule:#4a3226;
-    --blue:#8fb8d8; --blue-soft:#182530; --blue-rule:#2e4560;
-    --mono-surface:#1c2118; --mono-ink:#c7d0ba;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#12160f; --bg-raised:#1a1f17; --bg-sunken:#0d1109;
-  --ink:#eae6d8; --ink-dim:#a3a894; --ink-faint:#767c68;
-  --rule:#2c3226; --rule-strong:#3c4432;
-  --accent:#74c39a; --accent-ink:#0c1710; --accent-soft:#1c2b21; --accent-rule:#33513f;
-  --gold:#d9b354; --gold-soft:#2b2513; --gold-rule:#4a3d1c;
-  --red:#d98a70; --red-soft:#2c1e17; --red-rule:#4a3226;
-  --blue:#8fb8d8; --blue-soft:#182530; --blue-rule:#2e4560;
-  --mono-surface:#1c2118; --mono-ink:#c7d0ba;
-}
 *{box-sizing:border-box}
 body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.62}
 ::selection{background:var(--accent-soft); color:var(--ink)}
