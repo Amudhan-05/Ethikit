@@ -23,6 +23,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
+from .theme import BASE
 from .. import coverage as coverage_mod
 from .. import principles as principles_mod
 from ..benchmark.models import family_of, flat_classifiers
@@ -123,19 +124,17 @@ def _try_export_mct_json(card: Dict[str, object], out_path: str) -> None:
         pass  # optional sidecar only -- never block the HTML deliverable on this
 
 
-_STYLE = """
-body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:40px;color:#1c2530;background:#fbfaf7;max-width:860px}
-h1{font-size:24px;margin:0 0 4px} .sub{color:#6b7683;margin-bottom:28px}
-h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:#3a6b5a;margin-top:30px;border-bottom:1px solid #e7e3da;padding-bottom:6px}
+_STYLE = BASE + """
+body{max-width:860px}
+h1{font-size:24px;margin:0 0 4px}
+h2{font-size:15px;margin-top:30px;border-bottom:1px solid var(--rule);padding-bottom:6px}
 table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
-th,td{padding:6px 10px;border-bottom:1px solid #e7e3da;text-align:left}
-th{color:#6b7683;font-weight:600}
-.pill{display:inline-block;background:#e6f0eb;color:#2f5f4e;border-radius:20px;padding:3px 10px;margin:2px 3px;font-size:12px}
-.pill.gov{background:#f3ece0;color:#7a5c2a}
-.pill.other{background:#eef1f5;color:#3d4f66}
-.note{background:#fff6e9;border-left:3px solid #e0a54b;padding:10px 14px;font-size:13px;color:#5c4a2a;margin-top:8px}
-code{background:#f2efe8;padding:1px 5px;border-radius:4px;font-size:12px}
-.mech{max-width:340px;white-space:normal;color:#4a5560;font-size:12px}
+th,td{padding:6px 10px;border-bottom:1px solid var(--rule);text-align:left}
+th{font-weight:600}
+.pill{padding:3px 10px;margin:2px 3px;font-size:12px}
+.note{padding:10px 14px;font-size:13px;margin-top:8px}
+code{padding:1px 5px;font-size:12px}
+.mech{max-width:340px;white-space:normal;color:var(--ink-dim);font-size:12px}
 """
 
 
@@ -199,7 +198,7 @@ tool-addressable ethics principles before a human makes a deployment decision. N
 validated for production use on any real population.</p>
 
 <h2>Quantitative analysis</h2>
-<p style="font-size:13px;color:#6b7683">The Mechanism column is the specific computation behind
+<p class="muted">The Mechanism column is the specific computation behind
 each number in <em>this run</em> -- not a black-box score. See "Tool coverage" below for
 alternative tools you could reach for on the same principle.</p>
 <table><tr><th>Principle</th><th>Evaluator</th><th>Metric</th><th>Inspects</th>
@@ -207,10 +206,10 @@ alternative tools you could reach for on the same principle.</p>
 
 <h2>Per-principle profile (0-1, 1 = best among candidates in this run)</h2>
 <table><tr><th>Principle</th><th>Normalized score</th></tr>{profile_rows}</table>
-<p style="font-size:13px;color:#6b7683">{pareto_line}</p>
+<p class="muted">{pareto_line}</p>
 
 <h2>Tool coverage</h2>
-<p style="font-size:13px;color:#6b7683">Which registered tool(s) actually scored this model on
+<p class="muted">Which registered tool(s) actually scored this model on
 each principle above (green), and which other registered tool(s) also address that principle
 but weren't the source of these numbers (grey) -- a second opinion is one <code>register()</code>
 call away. Full reverse map: <code>ethikit.coverage.principle_to_tools()</code>.</p>

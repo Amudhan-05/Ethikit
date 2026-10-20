@@ -10,15 +10,31 @@ runs Streamlit apps for free).
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# `streamlit run demo/app.py` only puts demo/ on sys.path; make the repo root importable
+# so the demo works from a plain clone without `pip install -e .`.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import pandas as pd
 import plotly.graph_objects as pgo
 import streamlit as st
+from matplotlib.colors import LinearSegmentedColormap
 
 from ethikit.data import load_adult, make_synthetic_fairness_dataset
 from ethikit.benchmark import run_benchmark, CLASSIFIERS, family_of
 from ethikit.scoring import normalize, objective_matrix, pareto_front, principle_profile, weighted_score
 from ethikit.report import render_model_cards
 from ethikit.coverage import principle_to_tools, tool_info
+
+# Proposal palette (green, amber, blue, clay, purple) lifted for a dark background.
+_COLORWAY = ["#5fb893", "#e3a54a", "#82b4da", "#e08a62", "#b8a0d6", "#c8d26b"]
+
+
+# Leaderboard heat: panel colour -> proposal green, so light cell text stays readable.
+_GREENS = LinearSegmentedColormap.from_list("ethikit_green", ["#17211d", "#2f6f57"])
+
 
 def plotly_radar(radar: pd.DataFrame) -> pgo.Figure:
     """One closed polygon per model over the per-principle profile columns."""
@@ -31,8 +47,13 @@ def plotly_radar(radar: pd.DataFrame) -> pgo.Figure:
             r=r + [r[0]], theta=theta, name=model, fill="toself", opacity=0.55,
         ))
     fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
-        showlegend=True, margin=dict(l=40, r=40, t=20, b=20), height=420,
+        template="plotly_dark", colorway=_COLORWAY,
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#e6eee9"),
+        polar=dict(bgcolor="#17211d",
+                   radialaxis=dict(visible=True, range=[0, 1], gridcolor="#35493f"),
+                   angularaxis=dict(gridcolor="#35493f")),
+        showlegend=True, margin=dict(l=80, r=80, t=20, b=20), height=420,
     )
     return fig
 
@@ -91,7 +112,7 @@ if go:
 
     st.subheader("Leaderboard")
     st.caption(f"Dataset: {ds.name} · sensitive attribute: {ds.sensitive_name}")
-    st.dataframe(obj.style.background_gradient(cmap="Greens", axis=0), use_container_width=True)
+    st.dataframe(obj.style.background_gradient(cmap=_GREENS, axis=0), use_container_width=True)
 
     c1, c2 = st.columns(2)
     with c1:

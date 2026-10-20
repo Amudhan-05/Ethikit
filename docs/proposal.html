@@ -4,57 +4,60 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit — Project Proposal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="theme.css">
 <style>
-  :root{
-    --ink:#17211d; --ink-soft:#55635c; --paper:#f6f4ee; --panel:#ffffff;
-    --line:#e2ded3; --green:#2f6f57; --green-soft:#e4efe9; --clay:#c1663b;
-    --amber:#e3a54a; --blue:#3d6a8f;
-  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);
-       font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
-       line-height:1.55;-webkit-font-smoothing:antialiased}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:var(--font-body);
+       line-height:1.6;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--accent-soft);color:var(--ink)}
+  a{color:var(--accent)}
   .wrap{max-width:920px;margin:0 auto;padding:56px 32px 80px}
-  .kicker{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;
-          text-transform:uppercase;letter-spacing:.22em;font-size:12px;
-          color:var(--green);font-weight:700}
-  h1{font-size:44px;line-height:1.05;margin:10px 0 8px;letter-spacing:-.01em}
-  h1 .accent{color:var(--clay)}
-  .lede{font-size:19px;color:var(--ink-soft);max-width:64ch;margin:0 0 8px}
-  h2{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;
+  .kicker{font-family:var(--font-mono);
+          text-transform:uppercase;letter-spacing:.16em;font-size:12px;
+          color:var(--accent);font-weight:600}
+  h1{font-family:var(--font-display);font-weight:800;font-size:clamp(40px,7vw,68px);
+     line-height:1;margin:10px 0 12px}
+  h1 .accent{color:var(--red)}
+  .lede{font-size:19px;color:var(--ink-dim);max-width:64ch;margin:0 0 8px}
+  h2{font-family:var(--font-mono);
      font-size:13px;text-transform:uppercase;letter-spacing:.14em;
-     color:var(--green);margin:52px 0 14px;padding-bottom:8px;
-     border-bottom:1px solid var(--line)}
+     color:var(--accent);margin:52px 0 14px;padding-bottom:8px;
+     border-bottom:1px solid var(--rule)}
   p{margin:0 0 14px}
-  .sans{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif}
+  b,strong{color:var(--ink)}
+  .sans{font-family:var(--font-body)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
-        padding:18px 20px}
+  .card{background:var(--bg-raised);border:1px solid var(--rule);border-radius:8px;
+        padding:18px 20px;box-shadow:var(--shadow)}
   .card h3{margin:0 0 6px;font-size:16px}
-  .card p{font-size:14.5px;color:var(--ink-soft);margin:0}
-  .pill{display:inline-block;background:var(--green-soft);color:var(--green);
-        border-radius:20px;padding:4px 12px;margin:3px 5px 3px 0;font-size:13px;
-        font-family:ui-sans-serif,system-ui,sans-serif}
+  .card p{font-size:14.5px;color:var(--ink-dim);margin:0}
+  .pill{display:inline-block;background:var(--accent-soft);color:var(--accent);
+        border:1px solid var(--accent-rule);
+        border-radius:20px;padding:4px 12px;margin:3px 5px 3px 0;font-size:13px}
   figure{margin:8px 0 6px}
-  figcaption{font-family:ui-sans-serif,system-ui,sans-serif;font-size:12.5px;
-             color:var(--ink-soft);text-align:center;margin-top:6px}
-  table{width:100%;border-collapse:collapse;font-size:14px;
-        font-family:ui-sans-serif,system-ui,sans-serif}
-  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);
+  figcaption{font-size:12.5px;
+             color:var(--ink-dim);text-align:center;margin-top:6px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--rule);
         vertical-align:top}
-  th{color:var(--green);font-weight:600;font-size:12px;text-transform:uppercase;
+  th{color:var(--accent);font-weight:600;font-size:12px;text-transform:uppercase;
      letter-spacing:.04em}
-  td code{background:#eef1ee;padding:1px 6px;border-radius:5px;font-size:12.5px}
-  .tag{font-size:11px;padding:2px 8px;border-radius:5px;font-family:ui-sans-serif,sans-serif}
-  .t-data{background:#eaf0f5;color:var(--blue)}
-  .t-model{background:#efe7f3;color:#6b4d86}
-  .t-pred{background:var(--green-soft);color:var(--green)}
-  .t-beh{background:#fbeee0;color:var(--clay)}
-  .note{background:#fff7ea;border-left:3px solid var(--amber);border-radius:0 8px 8px 0;
-        padding:14px 18px;font-size:14.5px;color:#5f4a24;margin:16px 0}
-  .foot{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);
-        font-family:ui-sans-serif,sans-serif;font-size:12.5px;color:var(--ink-soft)}
-  @media(max-width:680px){.grid2{grid-template-columns:1fr}h1{font-size:34px}}
+  td code{background:var(--mono-surface);color:var(--mono-ink);padding:1px 6px;border-radius:5px;font-size:12.5px;font-family:var(--font-mono)}
+  .tag{font-size:11px;padding:2px 8px;border-radius:5px;border:1px solid transparent}
+  .t-data{background:var(--blue-soft);color:var(--blue);border-color:var(--blue-rule)}
+  .t-model{background:var(--purple-soft);color:var(--purple);border-color:var(--purple-rule)}
+  .t-pred{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-rule)}
+  .t-beh{background:var(--red-soft);color:var(--red);border-color:var(--red-rule)}
+  .t-doc{background:var(--bg-sunken);color:var(--ink-dim);border-color:var(--rule-strong)}
+  .note{background:var(--gold-soft);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;
+        padding:14px 18px;font-size:14.5px;color:var(--ink-dim);margin:16px 0}
+  .note b{color:var(--gold)}
+  .foot{margin-top:56px;padding-top:16px;border-top:1px solid var(--rule);
+        font-size:12.5px;color:var(--ink-faint)}
+  .muted{font-size:13px;color:var(--ink-dim)}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -86,10 +89,10 @@
   <figure>
   <svg viewBox="0 0 880 300" width="100%" role="img" aria-label="Four bodies feeding into nine shared principles">
     <style>
-      .lbl{font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:#17211d}
-      .src{font-family:ui-sans-serif,sans-serif;font-size:13px;fill:#fff;font-weight:600}
-      .pr{font-family:ui-sans-serif,sans-serif;font-size:12.5px;fill:#17211d}
-      .gov{fill:#8a9a92}
+      .lbl{font-family:var(--font-body);font-size:13px;fill:var(--ink)}
+      .src{font-family:var(--font-body);font-size:13px;fill:#fff;font-weight:600}
+      .pr{font-family:var(--font-body);font-size:12.5px;fill:var(--ink)}
+      .gov{fill:var(--ink-faint)}
     </style>
     <!-- sources -->
     <g>
@@ -99,28 +102,28 @@
       <rect x="20" y="198" width="150" height="34" rx="8" fill="#c1663b"/><text x="95" y="220" text-anchor="middle" class="src">Google</text>
     </g>
     <!-- connectors -->
-    <g stroke="#cdc9bd" stroke-width="1.4" fill="none">
+    <g stroke="var(--rule-strong)" stroke-width="1.4" fill="none">
       <path d="M170 47 C 300 47, 320 130, 430 130"/>
       <path d="M170 103 C 300 103, 320 140, 430 140"/>
       <path d="M170 159 C 300 159, 320 150, 430 150"/>
       <path d="M170 215 C 300 215, 320 160, 430 160"/>
     </g>
     <!-- hub -->
-    <rect x="430" y="112" width="70" height="66" rx="10" fill="#17211d"/>
+    <rect x="430" y="112" width="70" height="66" rx="10" fill="var(--bg-raised)" stroke="var(--accent-rule)" stroke-width="1.5"/>
     <text x="465" y="140" text-anchor="middle" class="src" font-size="12">shared</text>
     <text x="465" y="157" text-anchor="middle" class="src" font-size="12">check-</text>
     <text x="465" y="171" text-anchor="middle" class="src" font-size="12">list</text>
     <!-- principles -->
     <g>
-      <circle cx="560" cy="34" r="5" fill="#2f6f57"/><text x="574" y="39" class="pr">Fairness &amp; non-discrimination</text>
-      <circle cx="560" cy="64" r="5" fill="#2f6f57"/><text x="574" y="69" class="pr">Transparency</text>
-      <circle cx="560" cy="94" r="5" fill="#2f6f57"/><text x="574" y="99" class="pr">Explainability</text>
-      <circle cx="560" cy="124" r="5" fill="#2f6f57"/><text x="574" y="129" class="pr">Privacy &amp; data protection</text>
-      <circle cx="560" cy="154" r="5" fill="#2f6f57"/><text x="574" y="159" class="pr">Safety, security &amp; robustness</text>
-      <circle cx="560" cy="184" r="5" fill="#2f6f57"/><text x="574" y="189" class="pr">Inclusiveness &amp; diversity</text>
-      <circle cx="560" cy="214" r="5" class="gov"/><text x="574" y="219" class="pr">Accountability <tspan fill="#8a9a92">(governance)</tspan></text>
-      <circle cx="560" cy="244" r="5" class="gov"/><text x="574" y="249" class="pr">Human oversight <tspan fill="#8a9a92">(governance)</tspan></text>
-      <circle cx="560" cy="274" r="5" class="gov"/><text x="574" y="279" class="pr">Sustainability &amp; well-being <tspan fill="#8a9a92">(governance)</tspan></text>
+      <circle cx="560" cy="34" r="5" fill="var(--accent)"/><text x="574" y="39" class="pr">Fairness &amp; non-discrimination</text>
+      <circle cx="560" cy="64" r="5" fill="var(--accent)"/><text x="574" y="69" class="pr">Transparency</text>
+      <circle cx="560" cy="94" r="5" fill="var(--accent)"/><text x="574" y="99" class="pr">Explainability</text>
+      <circle cx="560" cy="124" r="5" fill="var(--accent)"/><text x="574" y="129" class="pr">Privacy &amp; data protection</text>
+      <circle cx="560" cy="154" r="5" fill="var(--accent)"/><text x="574" y="159" class="pr">Safety, security &amp; robustness</text>
+      <circle cx="560" cy="184" r="5" fill="var(--accent)"/><text x="574" y="189" class="pr">Inclusiveness &amp; diversity</text>
+      <circle cx="560" cy="214" r="5" class="gov"/><text x="574" y="219" class="pr">Accountability <tspan fill="var(--ink-faint)">(governance)</tspan></text>
+      <circle cx="560" cy="244" r="5" class="gov"/><text x="574" y="249" class="pr">Human oversight <tspan fill="var(--ink-faint)">(governance)</tspan></text>
+      <circle cx="560" cy="274" r="5" class="gov"/><text x="574" y="279" class="pr">Sustainability &amp; well-being <tspan fill="var(--ink-faint)">(governance)</tspan></text>
     </g>
   </svg>
   <figcaption>Green dots = a tool can measure it. Grey dots = governance principles handled by process &amp; documentation, not a metric.</figcaption>
@@ -139,14 +142,14 @@
       <tr><td>Explainability</td><td>SHAP, LIME, InterpretML</td>
           <td><span class="tag t-model">model internals</span> <span class="tag t-pred">predictions</span></td></tr>
       <tr><td>Transparency / Accountability</td><td>Model Card Toolkit, datasheets</td>
-          <td><span class="tag" style="background:#ece9e2;color:#55635c">documentation</span></td></tr>
+          <td><span class="tag t-doc">documentation</span></td></tr>
       <tr><td>Privacy</td><td>TensorFlow Privacy, Opacus, Presidio</td>
           <td><span class="tag t-data">data</span> <span class="tag t-beh">behavior</span></td></tr>
       <tr><td>Safety &amp; Robustness</td><td>Giskard, Adversarial Robustness Toolbox</td>
           <td><span class="tag t-beh">behavior</span></td></tr>
     </tbody>
   </table>
-  <p class="sans" style="font-size:13px;color:var(--ink-soft)">Giskard is the standout: one
+  <p class="sans muted">Giskard is the standout: one
   scan covers bias, robustness, and data leakage across every ML model type — and later
   extends to large language models. It's the natural long-term backbone.</p>
 
@@ -159,14 +162,14 @@
   <figure>
   <svg viewBox="0 0 880 250" width="100%" role="img" aria-label="Ethikit pipeline from inputs to scorecard">
     <style>
-      .bx{fill:#fff;stroke:#e2ded3;stroke-width:1.5}
-      .bt{font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:#17211d;font-weight:600}
-      .bs{font-family:ui-sans-serif,sans-serif;font-size:11px;fill:#55635c}
-      .stage{font-family:ui-sans-serif,sans-serif;font-size:11px;fill:#2f6f57;font-weight:700;letter-spacing:.08em}
-      .arw{stroke:#2f6f57;stroke-width:2;fill:none;marker-end:url(#ah)}
+      .bx{fill:var(--bg-raised);stroke:var(--rule-strong);stroke-width:1.5}
+      .bt{font-family:var(--font-body);font-size:13px;fill:var(--ink);font-weight:600}
+      .bs{font-family:var(--font-body);font-size:11px;fill:var(--ink-dim)}
+      .stage{font-family:var(--font-mono);font-size:11px;fill:var(--accent);font-weight:700;letter-spacing:.08em}
+      .arw{stroke:var(--accent);stroke-width:2;fill:none;marker-end:url(#ah)}
     </style>
     <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-      <path d="M0,0 L9,4.5 L0,9 z" fill="#2f6f57"/></marker></defs>
+      <path d="M0,0 L9,4.5 L0,9 z" fill="var(--accent)"/></marker></defs>
 
     <text x="20" y="30" class="stage">INPUT</text>
     <rect class="bx" x="20" y="40" width="140" height="70" rx="10"/>
@@ -179,7 +182,7 @@
     <path class="arw" d="M160 160 L 205 135"/>
 
     <text x="215" y="30" class="stage">ORCHESTRATOR</text>
-    <rect class="bx" x="215" y="40" width="150" height="170" rx="10" fill="#f0f5f2"/>
+    <rect class="bx" x="215" y="40" width="150" height="170" rx="10" fill="var(--accent-soft)"/>
     <text x="290" y="66" text-anchor="middle" class="bt">Adapter</text>
     <text x="290" y="82" text-anchor="middle" class="bs">one common plug</text>
     <rect class="bx" x="232" y="96" width="116" height="26" rx="6"/><text x="290" y="113" text-anchor="middle" class="bs">Fairness check</text>
@@ -241,8 +244,8 @@
     Ethikit &middot; open-source ethical-AI evaluation orchestrator &middot; built on Fairlearn,
     AIF360, SHAP, Giskard and the UNESCO / Microsoft / IBM / Google principle frameworks.
     Runs on scikit-learn today; deep-learning and LLM support planned.
-    <br><a href="index.html" style="color:var(--green)">All docs</a> &middot; See also: <a href="field-guide.html" style="color:var(--green)">the demo field guide</a>
-    and <a href="understanding.html" style="color:var(--green)">the technical companion</a>.
+    <br><a href="index.html">All docs</a> &middot; See also: <a href="field-guide.html" >the demo field guide</a>
+    and <a href="understanding.html" >the technical companion</a>.
   </div>
 
 </div>

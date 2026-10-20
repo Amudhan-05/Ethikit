@@ -5,30 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit Docs</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="theme.css">
 <style>
-:root{
-  --bg:#f6f3ea; --bg-raised:#fffdf8; --ink:#1b1f19; --ink-dim:#5c6259; --ink-faint:#8a8f80;
-  --rule:#ddd6c4; --rule-strong:#c7bea6;
-  --accent:#2c6a4f; --accent-soft:#e2eee5; --accent-rule:#a8cdb7;
-  --gold:#93691c; --gold-soft:#f3e8cd; --gold-rule:#dcc27f;
-  --font-display:"Big Shoulders",'Arial Narrow',sans-serif;
-  --font-body:"Public Sans",-apple-system,"Segoe UI",sans-serif;
-  --font-mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#12160f; --bg-raised:#1a1f17; --ink:#eae6d8; --ink-dim:#a3a894; --ink-faint:#767c68;
-    --rule:#2c3226; --rule-strong:#3c4432;
-    --accent:#74c39a; --accent-soft:#1c2b21; --accent-rule:#33513f;
-    --gold:#d9b354; --gold-soft:#2b2513; --gold-rule:#4a3d1c;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#12160f; --bg-raised:#1a1f17; --ink:#eae6d8; --ink-dim:#a3a894; --ink-faint:#767c68;
-  --rule:#2c3226; --rule-strong:#3c4432;
-  --accent:#74c39a; --accent-soft:#1c2b21; --accent-rule:#33513f;
-  --gold:#d9b354; --gold-soft:#2b2513; --gold-rule:#4a3d1c;
-}
 *{box-sizing:border-box}
 body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.6}
 a{color:var(--accent)}

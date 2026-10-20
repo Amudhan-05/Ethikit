@@ -4,5 +4,6 @@ __pycache__/
 ethikit_report.html
 model_cards/
 model_cards_test/
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 *.egg-info/

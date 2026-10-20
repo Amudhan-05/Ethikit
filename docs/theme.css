@@ -1,0 +1,42 @@
+/* Ethikit docs -- single dark theme shared by every page.
+ *
+ * Palette is taken from the project proposal (proposal.html's original tokens):
+ *   ink #17211d, green #2f6f57, clay #c1663b, amber #e3a54a, blue #3d6a8f, purple #6b4d86.
+ * Those hues are kept as the solid fills / borders; the lighter "text" variants
+ * (--accent, --gold, --red, --blue, --purple) are the same hues lifted so they read on
+ * a dark surface.
+ *
+ * The generated reports (ethikit/report/theme.py) carry the same values -- keep the two
+ * in sync if you change a colour here.
+ */
+:root{
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg:#0e1511; --bg-raised:#17211d; --bg-sunken:#0a100d;
+  --ink:#e6eee9; --ink-dim:#a2b3aa; --ink-faint:#72857b;
+  --rule:#25352d; --rule-strong:#35493f;
+
+  /* proposal green  (UNESCO / "tool can measure it") */
+  --green:#2f6f57;
+  --accent:#5fb893; --accent-ink:#07130e; --accent-soft:#17291f; --accent-rule:#2f6f57;
+  /* proposal amber  (caveats, governance) */
+  --amber:#e3a54a;
+  --gold:#e3a54a; --gold-soft:#2a2113; --gold-rule:#6e5224;
+  /* proposal clay   (Google / behaviour / warnings) */
+  --clay:#c1663b;
+  --red:#e08a62; --red-soft:#2d1b14; --red-rule:#7a4128;
+  /* proposal blue   (Microsoft / data) */
+  --blue-solid:#3d6a8f;
+  --blue:#82b4da; --blue-soft:#14222e; --blue-rule:#3d6a8f;
+  /* proposal purple (IBM / model internals) */
+  --purple-solid:#6b4d86;
+  --purple:#b8a0d6; --purple-soft:#221a2d; --purple-rule:#6b4d86;
+
+  --mono-surface:#121b17; --mono-ink:#c3d4ca;
+  --shadow:0 1px 0 rgba(0,0,0,.35);
+
+  --font-display:"Big Shoulders",'Arial Narrow',sans-serif;
+  --font-body:"Public Sans",-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
