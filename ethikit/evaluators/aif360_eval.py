@@ -71,6 +71,7 @@ class AIF360Evaluator(Evaluator):
         "PREDICTIONS against ground truth, like fairlearn, but adds the 80%-rule ratio "
         "and an individual-level inequality measure fairlearn doesn't compute."
     )
+    install_hint = "pip install aif360"
     formula = (
         "P = privileged group, U = unprivileged group\n"
         "disparate_impact = P(ŷ=1 | U) / P(ŷ=1 | P)             (1 = parity; < 0.8 fails the 80% rule)\n"

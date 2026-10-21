@@ -206,7 +206,8 @@ def cmd_list(a: argparse.Namespace) -> int:
     elif what == "tools":
         for t in cat["tools"]:
             flag = G("available") if t["available"] else Y("not installed")
-            print(f"{B(t['name']):<30} {flag:<20} principles: {', '.join(t['principles'])}")
+            hint = "" if t["available"] or not t["install_hint"] else D(f"   -> {t['install_hint']}")
+            print(f"{B(t['name']):<30} {flag:<20} principles: {', '.join(t['principles'])}{hint}")
     elif what == "params":
         if not a.name:
             raise SystemExit("usage: ethikit list params <model-or-tool>")
