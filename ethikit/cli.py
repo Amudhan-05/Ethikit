@@ -3,6 +3,8 @@
     python -m ethikit run [options]        evaluate models, stream the run, write report + cards
     python -m ethikit list <what>          datasets | models | tools | params <model|tool> | checklists
     python -m ethikit checklist <id>       write a blank answers template (or --markdown)
+    python -m ethikit datasheet [data]     a datasheet for the dataset, pre-filled from its profile
+    python -m ethikit bundle make|verify   the audit bundle: everything needed to reproduce a run
     python -m ethikit serve                start the live web console
     python -m ethikit export-site [dir]    copy the console + theme into the docs site, with a replay
 
@@ -228,6 +230,11 @@ def cmd_run(a: argparse.Namespace) -> int:
         json.dump({"config": cfg, **s}, fh)
     print(f"\n{D('wrote')} {report}\n{D('wrote')} {len(cards)} model cards in "
           f"{os.path.join(a.out, 'model_cards')}\n{D('wrote')} {os.path.join(a.out, 'results.json')}")
+    if a.bundle:
+        from .bundle import write_bundle
+        sheet_answers = _load_json(a.datasheet_answers) if a.datasheet_answers else None
+        path = write_bundle(a.bundle, cfg, s, prepared.checklist, sheet_answers)
+        print(f"{D('wrote')} audit bundle {path}  (check it: ethikit bundle verify {path})")
     if a.trace:
         for model, tools in s["traces"].items():
             for tool, t in tools.items():
@@ -280,6 +287,76 @@ def _print_stability(st):
           (f" (otherwise: {', '.join(st['main_rivals'])})" if st["main_rivals"] else ""))
     for v in st["per_principle"].values():
         print("  " + v["sentence"])
+
+
+def _load_json(path: str):
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def cmd_datasheet(a: argparse.Namespace) -> int:
+    from . import datasheet as ds_mod
+    from . import session
+    cfg = load_config_file(a.config) if a.config else config_from_args(a)
+    p = session.prepare({**cfg, "save": False})
+    sheet = ds_mod.build_datasheet(p.profile, cfg, p.dataset.feature_names)
+    if a.answers:
+        sheet = ds_mod.merge_answers(sheet, _load_json(a.answers))
+    os.makedirs(a.out, exist_ok=True)
+    base = os.path.join(a.out, "datasheet")
+    with open(base + ".md", "w", encoding="utf-8") as fh:
+        fh.write(ds_mod.to_markdown(sheet))
+    with open(base + ".html", "w", encoding="utf-8") as fh:
+        fh.write(ds_mod.to_html(sheet))
+    with open(base + ".json", "w", encoding="utf-8") as fh:
+        json.dump(sheet, fh, indent=2)
+    open_q = ds_mod.blank_answers(sheet)
+    with open(base + "_answers.json", "w", encoding="utf-8") as fh:
+        json.dump(open_q, fh, indent=2)
+    c = ds_mod.completeness(sheet)
+    print(f"{B('datasheet')} {sheet['title']}: {G(str(c['answered']))} of {c['total']} questions answered "
+          f"({c['by_you']} by you)")
+    for q in open_q:
+        print(D(f"  open: {q}"))
+    print(f"{D('wrote')} {base}.md / .html / .json\n{D('wrote')} {base}_answers.json  "
+          f"(fill in, then: ethikit datasheet ... --answers {base}_answers.json)")
+    return 0
+
+
+def cmd_bundle(a: argparse.Namespace) -> int:
+    from .bundle import verify_bundle, write_bundle
+    if a.action == "make":
+        from .runs import load_run, runs_dir
+        if not a.source:
+            raise SystemExit("usage: ethikit bundle make <saved-run-id | results.json> --out PATH")
+        if (runs_dir() / a.source).is_dir():
+            r = load_run(a.source)
+            config, summary = r["config"], r["summary"]
+        else:
+            data = _load_json(a.source)
+            config, summary = data.pop("config"), data
+        sheet_answers = _load_json(a.datasheet_answers) if a.datasheet_answers else None
+        path = write_bundle(a.out, config, summary, None, sheet_answers)
+        print(f"{D('wrote')} audit bundle {path}  (check it: ethikit bundle verify {path})")
+        return 0
+    if not a.source:
+        raise SystemExit("usage: ethikit bundle verify <folder | bundle.zip> [--no-rerun]")
+    print(D("checking checksums" + ("" if a.no_rerun else ", then re-running config.json ...")))
+    r = verify_bundle(a.source, rerun=not a.no_rerun)
+    for f in r["missing_files"]:
+        print(R(f"  missing: {f}"))
+    for f in r["tampered"]:
+        print(R(f"  changed since the bundle was made: {f}"))
+    for m in r["mismatches"]:
+        print(R(f"  {'/'.join(m['metric'])}: bundle {m['bundle']} vs re-run {m['rerun']}"))
+    for k in r["only_in_bundle"]:
+        print(R(f"  not reproduced (tool missing here?): {'/'.join(k)}"))
+    for k in r["only_in_rerun"]:
+        print(Y(f"  extra in the re-run (tool installed here but not there): {'/'.join(k)}"))
+    if not a.no_rerun:
+        print(f"  compared {r['compared']} metrics")
+    print(G("✓ bundle verified: every number reproduced, no file changed") if r["ok"] else R("✗ bundle did NOT verify"))
+    return 0 if r["ok"] else 1
 
 
 def cmd_profile(a: argparse.Namespace) -> int:
@@ -640,6 +717,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--export-config", metavar="PATH", help="write the config these flags describe and exit")
     r.add_argument("--no-save", action="store_true", help="don't save this run to the local run history")
     r.add_argument("--out", default="ethikit_out", help="output directory")
+    r.add_argument("--bundle", metavar="PATH", help="also write the audit bundle to PATH (a folder, or a .zip)")
+    r.add_argument("--datasheet-answers", metavar="JSON", help="your answers to the datasheet's open questions (for --bundle)")
     r.add_argument("--trace", action="store_true", help="print every tool's formula + worked steps")
     r.add_argument("-v", "--verbose", action="store_true")
     r.set_defaults(fn=cmd_run)
@@ -677,6 +756,24 @@ def build_parser() -> argparse.ArgumentParser:
     _data_flags(ex)
     ex.add_argument("--row", type=int, default=0)
     ex.set_defaults(fn=cmd_explain)
+
+    dsh = sub.add_parser("datasheet", help="a datasheet for the dataset (Gebru et al.), pre-filled from its profile")
+    _data_flags(dsh)
+    dsh.add_argument("--sensitive-threshold", type=float); dsh.add_argument("--positive-label")
+    dsh.add_argument("--exclude-sensitive", action="store_true")
+    dsh.add_argument("--synthetic", nargs="+", metavar="KEY=VALUE")
+    dsh.add_argument("--config", help="use a run's config: config.json, results.json or a saved run id")
+    dsh.add_argument("--answers", help="your answers JSON (from datasheet_answers.json)")
+    dsh.add_argument("--out", default="ethikit_out")
+    dsh.set_defaults(fn=cmd_datasheet)
+
+    bd = sub.add_parser("bundle", help="audit bundle: make one from a saved run, or verify one by re-running it")
+    bd.add_argument("action", choices=["make", "verify"])
+    bd.add_argument("source", nargs="?", help="make: saved run id or results.json; verify: bundle folder or .zip")
+    bd.add_argument("--out", default="ethikit_bundle", help="make: output folder (or .zip)")
+    bd.add_argument("--datasheet-answers", metavar="JSON")
+    bd.add_argument("--no-rerun", action="store_true", help="verify: check checksums only, don't re-run")
+    bd.set_defaults(fn=cmd_bundle)
 
     rh = sub.add_parser("runs", help="saved run history: list, show, diff")
     rh.add_argument("action", choices=["list", "show", "diff"])
@@ -731,4 +828,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return a.fn(a)
     except (KeyError, ValueError, FileNotFoundError) as exc:
         print(R(f"error: {exc}"), file=sys.stderr)
+        return 2
+    except OSError as exc:                     # e.g. a dataset download with no network
+        print(R(f"error: {exc} (a download failed? check the network, or use --data synthetic)"), file=sys.stderr)
         return 2

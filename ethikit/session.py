@@ -232,6 +232,9 @@ def execute(run: PreparedRun, on_event: Optional[Callable[[dict], None]] = None)
                 for m, row in obj_std.iterrows()},
             "notes": run.notes,
             "requirements": req, "stability": stability, "profile": run.profile,
+            "hyperparameters": {m: {k: repr(v) for k, v in sorted(hp.items())}
+                                for m, hp in run.hyperparameters.items()},
+            "origins": dict(run.origins), "feature_names": list(run.dataset.feature_names or []),
         }),
     }
     if run.save and run.config is not None:
