@@ -8,7 +8,7 @@ that best fits their context.
 
 Built around the principle sets published by **UNESCO, Microsoft, IBM, and Google**.
 
-**Where this is going:** see [ROADMAP.md](ROADMAP.md) -- milestones M1-M7 to completion, each with an exit test.
+**Where this is going:** [ROADMAP.md](ROADMAP.md) -- milestones M1-M7 to completion. **How to check it works:** [TESTING.md](TESTING.md) -- automated commands and a visual checklist for every milestone, plus a baseline you can run today.
 
 ## What it is -- and isn't
 
@@ -62,7 +62,7 @@ shift. See `examples/run_phase3_demo.py`.
 ethikit runs entirely on your machine: no accounts, no hosting, nothing leaves your computer
 (only the optional OpenML datasets, Adult and German Credit, need the network).
 
-**1. Set up** (Python 3.11 or 3.12 recommended; 3.13 works but the drift tool can't install)
+**1. Set up** (Python 3.12 is the project standard; 3.13 runs but the drift tool can't install there)
 
 ```bash
 git clone https://github.com/Amudhan-05/ethikit && cd ethikit
