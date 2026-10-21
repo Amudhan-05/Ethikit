@@ -14,7 +14,7 @@ def test_flags_become_the_same_config_the_console_builds():
     assert cfg["data"]["source"] == "synthetic_custom" and cfg["data"]["synthetic"]["n"] == "500"
     assert cfg["models"] == [{"name": "decision_tree", "params": {"max_depth": "3"}}]
     assert cfg["tool_params"] == {"robustness": {"sigma": "0.25"}}
-    assert cfg["weights"]["fairness"] == 0.9 and cfg["split"] == {"test_size": 0.3, "seed": 4, "scale": False}
+    assert cfg["weights"]["fairness"] == 0.9 and cfg["split"] == {"test_size": 0.3, "seed": 4, "scale": False, "cv": None}
 
 
 def test_malformed_param_flag_is_rejected():

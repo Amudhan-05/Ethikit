@@ -68,6 +68,9 @@ class PreparedRun:
     weights: Dict[str, float]
     checklist: Optional[dict]
     notes: List[str] = field(default_factory=list)
+    raw: Any = None                                # the unsplit RawData (needed for repeated CV)
+    cv: Optional[tuple] = None                     # (folds, repeats) or None
+    dataset_seed: int = 0
 
 
 def load_raw(data: Dict[str, Any], uploads: Optional[Dict[str, pd.DataFrame]] = None):
@@ -104,9 +107,16 @@ def prepare(config: Dict[str, Any], uploads: Optional[Dict[str, pd.DataFrame]] =
             uploaded_models: Optional[Dict[str, Any]] = None) -> PreparedRun:
     raw = load_raw(config.get("data") or {}, uploads)
     split = {"test_size": 0.3, "seed": 0, "scale": True, **(config.get("split") or {})}
+    cv = split.get("cv")
+    cv = (int(cv[0]), int(cv[1])) if cv else None
+    if cv and (cv[0] < 2 or cv[1] < 1):
+        raise ValueError("cv needs at least 2 folds and 1 repeat, e.g. 5x3")
     ds = loaders.split_dataset(raw, seed=int(split["seed"]), test_size=float(split["test_size"]),
                                scale=bool(split["scale"]))
 
+    if cv and any(m.get("file") or m.get("upload_model_id") for m in (config.get("models") or [])):
+        raise ValueError("pre-trained models can't be cross-validated (they are not refit); "
+                         "remove --cv or the --model-file")
     zoo = flat_classifiers() if ds.task == TaskType.CLASSIFICATION else flat_regressors()
     factories: Dict[str, Callable] = {}
     prefit: Dict[str, Any] = {}
@@ -153,16 +163,19 @@ def prepare(config: Dict[str, Any], uploads: Optional[Dict[str, pd.DataFrame]] =
     if raw.name.startswith("synthetic") and (config.get("data") or {}).get("source") == "adult":
         notes.append("UCI Adult was unreachable (no network); fell back to synthetic data.")
     return PreparedRun(ds, factories, prefit, evaluators, hyper, origins, weights,
-                       checklist, notes)
+                       checklist, notes, raw=raw, cv=cv, dataset_seed=int(split["seed"]))
 
 
 def execute(run: PreparedRun, on_event: Optional[Callable[[dict], None]] = None) -> Dict[str, Any]:
     """Run the sweep and score it. Returns everything a UI needs, JSON-ready
     except `raw` (the DataFrame, kept for rendering cards/reports)."""
-    raw = run_benchmark(run.dataset, run.factories, on_event=on_event,
-                        evaluators=run.evaluators, prefit=run.prefit)
-    dn = normalize(raw)
-    obj = objective_matrix(dn)
+    obj_std = None
+    if run.cv:
+        raw, obj, obj_std = _execute_cv(run, on_event)
+    else:
+        raw = run_benchmark(run.dataset, run.factories, on_event=on_event,
+                            evaluators=run.evaluators, prefit=run.prefit)
+        obj = objective_matrix(normalize(raw))
     front = pareto_front(obj)
     ranked = obj.copy()
     principles = [c for c in run.weights if c in ranked.columns and run.weights[c] > 0]
@@ -183,9 +196,62 @@ def execute(run: PreparedRun, on_event: Optional[Callable[[dict], None]] = None)
             "pareto": front, "weights": run.weights,
             "records": records, "traces": raw.attrs.get("traces", {}),
             "families": {m: family_of(m) for m in obj.index},
+            "cv": list(run.cv) if run.cv else None,
+            "objective_std": None if obj_std is None else {
+                m: {k: (None if pd.isna(v) else float(v)) for k, v in row.items()}
+                for m, row in obj_std.iterrows()},
             "notes": run.notes,
         }),
     }
+
+
+def _execute_cv(run: PreparedRun, on_event):
+    """Repeated k-fold: every fold is a full tool sweep. The console's graph animates the
+    FIRST fold only (later folds just advance a counter) so it isn't redrawn 15 times; the
+    reported profile is the mean over folds with the standard deviation alongside."""
+    from .benchmark.cv import run_benchmark_cv
+    emit = on_event or (lambda e: None)
+    folds, repeats = run.cv
+    total, state = folds * repeats, {"fold": 0}
+
+    def inner(e):
+        t = e["type"]
+        if t == "run_start":
+            state["fold"] += 1
+            if state["fold"] == 1:
+                emit({**e, "cv": [folds, repeats]})
+            emit({"type": "cv_fold", "i": state["fold"], "n": total})
+        elif t == "run_done":
+            return
+        elif state["fold"] == 1 or t == "tool_error":
+            emit(e)
+
+    cvdf = run_benchmark_cv(run.raw, run.factories, n_splits=folds, n_repeats=repeats,
+                            seed=run.dataset_seed,
+                            evaluators=run.evaluators, on_event=inner)
+    per = [objective_matrix(normalize(g.drop(columns=["repeat", "fold", "seed"])))
+           for _, g in cvdf.groupby(["repeat", "fold"])]
+    stack = pd.concat(per)
+    obj, std = stack.groupby(level=0).mean().round(3), stack.groupby(level=0).std().round(3)
+    key = ["model", "evaluator", "principle", "target", "metric", "higher_is_better"]
+    agg = (cvdf.groupby(key, dropna=False)["value"].mean().reset_index()
+           .merge(cvdf.drop_duplicates(key)[key + ["mechanism"]], on=key, how="left"))
+    agg.attrs["traces"] = cvdf.attrs.get("traces", {})
+    emit({"type": "run_done", "n_records": len(agg)})
+    return agg, obj, std
+
+
+def domains_catalogue() -> list:
+    from .domains import get_domains, STRENGTH_TEXT
+    out = []
+    for d in get_domains().values():
+        out.append({"id": d.id, "title": d.title, "blurb": d.blurb, "for_whom": d.for_whom,
+                    "strength": d.strength, "strength_text": STRENGTH_TEXT[d.strength],
+                    "caveats": d.caveats,
+                    "datasets": [{"id": s.id, "title": s.title, "source": s.source,
+                                  "sensitive": s.sensitive, "needs": s.needs, "note": s.note,
+                                  "verified": s.verified} for s in d.datasets]})
+    return out
 
 
 def catalogue() -> Dict[str, Any]:
@@ -210,4 +276,5 @@ def catalogue() -> Dict[str, Any]:
         "principles": [{"id": p.id, "name": p.name, "plain": p.plain,
                         "tool_addressable": p.tool_addressable} for p in principles_mod.PRINCIPLES],
         "checklists": [checklists_mod.as_dict(c) for c in checklists_mod.CHECKLISTS.values()],
+        "domains": domains_catalogue(),
     }

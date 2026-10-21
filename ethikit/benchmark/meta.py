@@ -1,7 +1,11 @@
 """Meta-benchmark: run the model zoo + ethics battery across MANY datasets
-(via PMLB -- https://github.com/EpistasisLab/pmlb) so "best model per
-family, in general" is an aggregate finding across many datasets, not a
-one-dataset anecdote (HANDOFF.md Phase 2).
+(via PMLB -- https://github.com/EpistasisLab/pmlb) so a family-level tendency
+is an aggregate over many datasets, not a one-dataset anecdote (HANDOFF.md
+Phase 2).
+
+LIMITS: the default suite is a generic sample with no sensitive attribute (so the
+fairness tools do not run in it) and is not organised by domain. For per-domain
+evidence with fairness columns use ethikit.domains (reference suites).
 
 PMLB over OpenML-CC18 here: no API key, direct GitHub-hosted CSVs, and a
 stable, well-known dataset list -- fewer moving parts for a demo that needs
@@ -116,8 +120,8 @@ def weighted_score_across_datasets(meta_raw: pd.DataFrame,
                                    weights: Dict[str, float]) -> pd.DataFrame:
     """model x {mean_weighted_score, family, n_datasets}, averaged across
     datasets -- the generalised version of run_demo.py's single-dataset
-    "best model per family" block. Sort and groupby('family').head(1) on the
-    result for "best model per family, in general."
+    top-scoring-family block. Sort and groupby('family').head(1) on the
+    result for the leading model of each family across this suite.
     """
     from ..scoring import normalize, objective_matrix, weighted_score
     from .models import family_of

@@ -25,7 +25,7 @@ network at build time to fetch a dataset (the app itself stays offline-capable).
 
 **Exit:** `pytest` green locally and in CI on Python 3.12; Adult run uses categorical features; every skipped tool says why.
 
-## M2 -- Reference suites per domain (choose a model *before* you have your own data)
+## M2 -- Reference suites per domain (choose a model *before* you have your own data)  **[BUILT -- live-download check pending]**
 
 **Purpose.** When an organisation has no trained model or labelled data yet, the honest question
 is: "for data like ours, which kind of model tends to do best on the ethics profile, so where
@@ -58,6 +58,8 @@ Candidate suites (what is verified vs. still to check):
 Honest limits to keep visible in the product: the literature itself questions whether Adult,
 COMPAS and German Credit are good general-purpose fairness benchmarks, and a domain suite is
 only as relevant as its resemblance to *your* population.
+
+**Status:** 2.1 registry, 2.3 runner/aggregation/significance/cross-domain comparison, 2.4 console + CLI (with a shortlist that always weighs utility, and absolute-unit tables beside the relative ones), 2.5 repeated CV (`--cv 5x3`) and 2.6 language audit are built and tested. COMPAS is verified on real data. **Not yet verified:** the census, OpenML and fairlearn downloads (blocked in the build sandbox) -- see TESTING.md L1-L8. **Not done:** regenerating the field guide's rigor table from a fresh run (needs `pip install pmlb` and a network); education and extra health suites (no verified source yet).
 
 **Exit:** `ethikit domains run lending` gives per-domain family tables **with fairness columns**
 and spreads; the console can show them; no doc claims a cross-domain finding the suite can't support.

@@ -26,6 +26,9 @@ streamlit>=1.30
 plotly>=5.18
 matplotlib>=3.7        # backs pandas Styler.background_gradient in the leaderboard table
 
+# Reference suites (census domain downloads ACS data through folktables)
+folktables>=0.0.12      # US Census ACS tasks; data is fetched once from census.gov and cached
+
 # Phase 2 (generalization / meta-benchmark / significance)
 pmlb>=1.0               # meta-benchmark dataset suite (github-hosted, no API key)
 scipy>=1.11              # Friedman test (already pulled in transitively by giskard)

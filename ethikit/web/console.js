@@ -21,6 +21,7 @@
     tools: null, toolParams: {}, weights: {},
     result: null, running: false,
     checklistId: "deon", answers: {},
+    mode: "mine", domain: "census", suite: null, suiteDatasets: {},
   };
 
   function esc(s) {
@@ -96,7 +97,7 @@
     $("#csv-file").addEventListener("change", uploadCsv);
     $("#model-file").addEventListener("change", uploadModel);
     ["#target", "#sensitive", "#exclude-sensitive", "#positive-label", "#sensitive-threshold",
-     "#seed", "#test-size", "#no-scale"].forEach(function (s) {
+     "#seed", "#test-size", "#no-scale", "#cv", "#max-datasets", "#max-rows", "#states"].forEach(function (s) {
       $(s).addEventListener("input", update);
       $(s).addEventListener("change", update);
     });
@@ -106,7 +107,15 @@
       $("#copy").textContent = "copied"; setTimeout(function () { $("#copy").textContent = "copy"; }, 1200);
     });
     $("#run").addEventListener("click", run);
+    document.querySelectorAll("input[name=mode]").forEach(function (r) {
+      r.addEventListener("change", function () { if (r.checked) setMode(r.value); });
+    });
+    var dsel = $("#domain");
+    (S.meta.domains || []).forEach(function (d) { dsel.appendChild(el("option", { value: d.id }, esc(d.id) + " — " + esc(d.title))); });
+    dsel.value = S.domain;
+    dsel.addEventListener("change", function () { S.domain = dsel.value; renderDomain(); update(); });
     if (!S.live) {
+      $("#row-mode").hidden = true;
       $("#row-modelfile").hidden = true;
       $("#run").textContent = "▶ replay run";
     }
@@ -315,13 +324,38 @@
     return {
       data: data,
       split: { test_size: parseFloat($("#test-size").value) || 0.3, seed: parseInt($("#seed").value, 10) || 0,
-               scale: !$("#no-scale").checked },
+               scale: !$("#no-scale").checked, cv: parseCv($("#cv").value) },
       models: models, tools: Array.from(S.tools), tool_params: tp, weights: S.weights,
       checklist: Object.keys(S.answers).length ? { checklist: S.checklistId, answers: S.answers } : null,
     };
   }
 
+  function parseCv(v) {
+    var m = /^\s*(\d+)\s*[xX]\s*(\d+)\s*$/.exec(v || "");
+    return m ? [parseInt(m[1], 10), parseInt(m[2], 10)] : null;
+  }
+
+  function suiteConfig() {
+    var cv = parseCv($("#cv").value);
+    return { domain: S.domain, models: Array.from(S.models), tools: Array.from(S.tools),
+             max_datasets: $("#max-datasets").value || null, max_rows: parseInt($("#max-rows").value, 10) || 5000,
+             states: S.domain === "census" ? $("#states").value : null, cv: cv,
+             seed: parseInt($("#seed").value, 10) || 0, weights: S.weights };
+  }
+
   function commandLine() {
+    if (S.mode === "suite") {
+      var sc = suiteConfig(); var p = ["ethikit domains run " + sc.domain];
+      if (sc.models.length) p.push("--models " + sc.models.join(","));
+      var avail = S.meta.tools.filter(function (t) { return t.available; }).map(function (t) { return t.name; });
+      if (S.tools.size !== avail.length) p.push("--tools " + Array.from(S.tools).join(","));
+      if (sc.max_datasets) p.push("--max-datasets " + sc.max_datasets);
+      if (sc.max_rows !== 5000) p.push("--max-rows " + sc.max_rows);
+      if (sc.states && sc.states !== "CA,TX,NY") p.push("--states " + sc.states);
+      if (sc.cv) p.push("--cv " + sc.cv[0] + "x" + sc.cv[1]);
+      if (sc.seed) p.push("--seed " + sc.seed);
+      return p.join(" \\\n    ");
+    }
     var c = config(); var parts = ["ethikit run"];
     if (S.source === "csv") {
       parts.push("--data " + ((S.upload && S.upload.name) || "your_data") + ".csv");
@@ -351,6 +385,7 @@
     if (c.split.seed !== 0) parts.push("--seed " + c.split.seed);
     if (c.split.test_size !== 0.3) parts.push("--test-size " + c.split.test_size);
     if (!c.split.scale) parts.push("--no-scale");
+    if (c.split.cv) parts.push("--cv " + c.split.cv[0] + "x" + c.split.cv[1]);
     if (c.checklist) parts.push("--checklist " + S.checklistId + "_answers.json");
     return parts.join(" \\\n    ");
   }
@@ -358,8 +393,10 @@
 
   function update() {
     $("#cmd-preview").textContent = commandLine();
-    var ok = S.models.size + S.estimators.length + (S.modelFile ? 1 : 0) > 0 && S.tools.size > 0 &&
-             (S.source !== "csv" || (S.upload && $("#target").value));
+    var ok = S.mode === "suite"
+      ? S.models.size > 0 && S.tools.size > 0 && domainInfo() && domainInfo().datasets.length > 0
+      : S.models.size + S.estimators.length + (S.modelFile ? 1 : 0) > 0 && S.tools.size > 0 &&
+        (S.source !== "csv" || (S.upload && $("#target").value));
     $("#run").disabled = S.running || !ok;
   }
 
@@ -380,6 +417,7 @@
     $("#log").innerHTML = ""; LOG_T0 = performance.now();
     $("#run-label").textContent = "";
     if (!S.live) return replay();
+    if (S.mode === "suite") return runSuite();
     log("run", "» " + commandLine().replace(/\s*\\\n\s*/g, " "));
     fetch("api/run", { method: "POST", headers: { "Content-Type": "application/json" },
                        body: JSON.stringify(config()) })
@@ -450,6 +488,7 @@
       case "tool_error":
         log("err", "  ✗   " + e.tool + " → " + e.model + ": " + e.error);
         G && G.toolError(e.model, e.tool); break;
+      case "cv_fold": $("#prog-text").textContent = "cross-validation fold " + e.i + " / " + e.n; break;
       case "run_done": log("ok", "done  " + e.n_records + " measurements"); break;
       case "error": log("err", "error " + e.error); break;
       case "result":
@@ -708,7 +747,8 @@
       "<th>weighted</th><th>pareto</th></tr>";
     var rows = sc.models.map(function (m) {
       return "<tr><td><span class='sw s" + colourIndex(m) + "'></span> " + esc(m) + "</td><td class='l dim'>" + esc(r.families[m] || "custom") + "</td>" +
-        sc.cols.map(function (c) { var v = r.objective[m][c]; return "<td class='heat' style='--h:" + (v || 0) + "'>" + fmt(v) + "</td>"; }).join("") +
+        sc.cols.map(function (c) { var v = r.objective[m][c]; var sd = r.objective_std && r.objective_std[m] ? r.objective_std[m][c] : null;
+          return "<td class='heat' style='--h:" + (v || 0) + "'>" + fmt(v) + (sd != null ? " <span class='dim'>±" + sd.toFixed(2) + "</span>" : "") + "</td>"; }).join("") +
         "<td><b>" + fmt(sc.score[m]) + "</b></td><td>" + (r.pareto.indexOf(m) >= 0 ? "<span class='pill'>front</span>" : "<span class='dim'>–</span>") + "</td></tr>";
     }).join("");
     var wtxt = Object.keys(S.weights).filter(function (p) { return S.weights[p] > 0; }).map(function (p) { return p + "=" + S.weights[p]; }).join(", ");
@@ -993,7 +1033,118 @@
   // ------------------------------------------------------------------ tabs
   function showTab(name) {
     document.querySelectorAll(".tabs button").forEach(function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === name)); });
-    ["results", "inspect", "card", "gov"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
+    ["results", "inspect", "card", "suite", "gov"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
+  }
+
+  // ------------------------------------------------------------------ reference suites
+  function domainInfo() {
+    return (S.meta.domains || []).filter(function (d) { return d.id === S.domain; })[0];
+  }
+
+  function setMode(m) {
+    S.mode = m;
+    document.body.classList.toggle("suite-mode", m === "suite");
+    ["#row-domain", "#row-suite-datasets", "#row-suite-opts", "#row-suite-caveats"].forEach(function (s) { $(s).hidden = m !== "suite"; });
+    if (m === "suite") renderDomain();
+    update();
+  }
+
+  function renderDomain() {
+    var d = domainInfo(); if (!d) return;
+    $("#domain-strength").textContent = d.strength;
+    $("#domain-strength").className = "pill " + (d.strength === "suite" ? "" : d.strength === "gap" ? "red" : "gold");
+    $("#domain-blurb").textContent = d.strength_text;
+    $("#states-wrap").hidden = d.id !== "census";
+    var box = $("#suite-datasets"); box.innerHTML = "";
+    if (!d.datasets.length) box.appendChild(el("div", { class: "dim" }, "no datasets: " + esc(d.strength_text)));
+    d.datasets.slice(0, 40).forEach(function (s) {
+      var row = el("div", { class: "ds-row", "data-id": s.id }, "<span class='t' title='" + esc(s.source + " · sensitive: " + s.sensitive) + "'>" + esc(s.title) + "</span>");
+      row.appendChild(el("span", { class: "st" }, s.verified ? "verified" : "first run on your machine"));
+      box.appendChild(row);
+    });
+    $("#suite-caveats").innerHTML = d.caveats.map(function (c) { return "<div>! " + esc(c) + "</div>"; }).join("") +
+      (d.for_whom ? "<div class='dim' style='margin-top:6px'>For: " + esc(d.for_whom) + "</div>" : "");
+  }
+
+  function runSuite() {
+    var sc = suiteConfig();
+    log("run", "» " + commandLine().replace(/\s*\\\n\s*/g, " "));
+    $("#graph").innerHTML = ""; drawGraphIdle();
+    fetch("api/domain-run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) })
+      .then(function (resp) {
+        var reader = resp.body.getReader(); var dec = new TextDecoder(); var buf = "";
+        function pump() {
+          return reader.read().then(function (r) {
+            if (r.done) { if (buf.trim()) onSuiteEvent(JSON.parse(buf)); return finish(); }
+            buf += dec.decode(r.value, { stream: true });
+            var lines = buf.split("\n"); buf = lines.pop();
+            lines.forEach(function (l) { if (l.trim()) onSuiteEvent(JSON.parse(l)); });
+            return pump();
+          });
+        }
+        return pump();
+      }).catch(function (e) { log("err", "connection error: " + e.message); finish(); });
+  }
+
+  function dsRow(id) { return document.querySelector("#suite-datasets .ds-row[data-id='" + id + "']"); }
+
+  function onSuiteEvent(e) {
+    switch (e.type) {
+      case "domain_start":
+        log("run", "suite " + e.domain + ": " + e.datasets.length + " datasets × " + e.models.length + " models × " + e.tools.length + " tools");
+        $("#prog").style.width = "0%"; S.suiteDone = 0; S.suiteTotal = e.datasets.length; break;
+      case "dataset_start": {
+        log("fit", "data  [" + e.i + "/" + e.n + "] " + e.title);
+        var r = dsRow(e.id); if (r) { r.className = "ds-row run"; r.lastChild.textContent = "running…"; }
+        $("#prog-text").textContent = "dataset " + e.i + " / " + e.n; break; }
+      case "dataset_done": {
+        log("ok", "      ✓ " + e.n_rows + " rows · positive rate " + e.positive_rate + " · " + e.seconds + "s");
+        var r2 = dsRow(e.id); if (r2) { r2.className = "ds-row ok"; r2.lastChild.textContent = "done · " + e.n_rows + " rows"; }
+        S.suiteDone++; $("#prog").style.width = (100 * S.suiteDone / S.suiteTotal) + "%"; break; }
+      case "dataset_skip": {
+        log("err", "      ✗ skipped: " + e.reason);
+        var r3 = dsRow(e.id); if (r3) { r3.className = "ds-row skip"; r3.lastChild.textContent = "skipped"; r3.firstChild.title = e.reason; }
+        S.suiteDone++; $("#prog").style.width = (100 * S.suiteDone / S.suiteTotal) + "%"; break; }
+      case "domain_done": log("ok", "done  " + e.n_datasets + " dataset(s) ran, " + e.n_skipped + " skipped"); break;
+      case "error": log("err", "error " + e.error); S.suite = null; $("#tab-suite").innerHTML = "<div class='note'>" + esc(e.error) + "</div>"; showTab("suite"); break;
+      case "domain_result":
+        S.suite = e; $("#run-label").textContent = e.domain + " suite · " + e.datasets.length + " datasets";
+        renderSuite(); showTab("suite"); log("ok", "leading families: " + Object.keys(e.top_family).map(function (p) { return p + "=" + e.top_family[p]; }).join(", ")); break;
+    }
+  }
+
+  function renderSuite() {
+    var r = S.suite; var box = $("#tab-suite"); box.innerHTML = "";
+    var order = ["utility", "fairness", "inclusiveness", "explainability", "transparency", "privacy", "safety"];
+    var cols = order.filter(function (p) { return r.family_table.some(function (x) { return x.principle === p; }); });
+    var fams = Array.from(new Set(r.family_table.map(function (x) { return x.family; })));
+    function cell(f, p) { var x = r.family_table.filter(function (y) { return y.family === f && y.principle === p; })[0];
+      return x ? "<td class='heat' style='--h:" + (x.mean || 0) + "'>" + fmt(x.mean) + " <span class='dim'>±" + (x.std == null ? "–" : x.std.toFixed(2)) + "</span></td>" : "<td>–</td>"; }
+    var rel = "<div class='tscroll'><table class='t'><tr><th>family</th>" + cols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "</tr>" +
+      fams.map(function (f) { return "<tr><td>" + esc(f) + "</td>" + cols.map(function (c) { return cell(f, c); }).join("") + "</tr>"; }).join("") + "</table></div>";
+    var labels = r.key_metric_labels; var mets = Object.keys(labels).filter(function (m) { return r.absolute_table.some(function (x) { return x[m] != null; }); });
+    var abs = "<div class='tscroll'><table class='t'><tr><th>family</th>" + mets.map(function (m) { return "<th>" + esc(labels[m]) + "</th>"; }).join("") + "</tr>" +
+      r.absolute_table.map(function (x) { return "<tr><td>" + esc(x.family) + "</td>" + mets.map(function (m) { return "<td>" + fmt(x[m]) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>";
+    var lead = cols.map(function (p) { return "<tr><td>" + esc(p) + "</td><td class='l'>" + esc(r.top_family[p]) + "</td><td>" + (r.datasets.length < 2 ? "–" : Math.round(100 * (r.agreement[p] || 0)) + "%") + "</td><td class='l'>" +
+      (r.significance[p] && r.significance[p].p_value != null ? "p=" + r.significance[p].p_value + (r.significance[p]["significant_at_0.05"] ? " (significant)" : " (not significant)") : "<span class='dim'>" + esc((r.significance[p] || {}).skipped || "") + "</span>") + "</td></tr>"; }).join("");
+    var sl = r.shortlist;
+    box.innerHTML =
+      "<h3>" + esc(r.title) + "</h3><p class='prose'><b>" + esc(r.strength_text) + ".</b> " + r.datasets.length + " dataset(s) ran" +
+      (r.skipped.length ? ", " + r.skipped.length + " skipped (hover the grey rows above for why)" : "") + (r.cv ? "; each scored with " + r.cv[0] + "×" + r.cv[1] + " cross-validation" : "") +
+      ". This is a <i>prior</i> about kinds of model in this field — not a verdict on any model for your population.</p>" +
+      "<h3>family evidence — relative (0–1, mean ± std over datasets)</h3>" + rel +
+      "<h3>the same families in real units</h3><p class='dim small'>Relative scores only say who beat whom <i>here</i>; these say how good, actually (accuracy, AUC, stability, fidelity: higher is better; gaps and MI advantage: lower is better).</p>" + abs +
+      "<h3>does the ordering hold up?</h3><div class='tscroll'><table class='t'><tr><th>principle</th><th>leading family</th><th>also leads on…</th><th>Friedman over datasets</th></tr>" + lead + "</table></div>" +
+      "<div class='res-grid'><div><h3>starting shortlist for your own data</h3><p class='prose'>Families to try first: " + sl.families.map(function (f) { return "<span class='pill'>" + esc(f) + "</span>"; }).join("") +
+      "<br>Models: " + sl.models.map(esc).join(", ") + "<br><span class='dim small'>weights used: " + Object.keys(sl.weights_used).map(function (k) { return k + "=" + sl.weights_used[k]; }).join(", ") + ". " + esc(sl.caveat) + "</span></p>" +
+      "<button class='btn primary' id='use-shortlist' type='button'>use this shortlist on my data</button></div>" +
+      "<div><h3>caveats</h3><div class='note'>" + r.caveats.concat(r.notes || []).map(function (c) { return "<div>! " + esc(c) + "</div>"; }).join("") + "</div>" +
+      "<h3 style='margin-top:14px'>datasets that ran</h3>" + r.datasets.map(function (d) { return "<div class='small'><b>" + esc(d.id) + "</b> · " + d.n_rows + " rows · sensitive: " + esc(d.sensitive) + (d.verified ? "" : " <span class='dim'>(first real run of this loader)</span>") + "</div>"; }).join("") + "</div></div>";
+    $("#use-shortlist").addEventListener("click", function () {
+      S.models = new Set(sl.models); document.querySelector("input[name=mode][value=mine]").checked = true;
+      setMode("mine"); renderModels(); update(); window.scrollTo({ top: 0, behavior: "smooth" });
+      log("ok", "shortlist loaded: " + sl.models.join(", ") + " — now choose your data and run");
+    });
   }
 
   boot();

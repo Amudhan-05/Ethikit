@@ -78,21 +78,45 @@ What each file guarantees:
 5. With network: `python -m ethikit run --data adult`; **see** `workclass=...`-style features in the model card's Quantitative Analysis, and a fairness gap on `sex`.
 6. Run the same command twice with `--seed 5`; **see** byte-identical numbers in `results.json` (compare with `diff`), including `adversarial_perturbation_size`.
 
-## M2 -- Reference suites per domain
+## M2 -- Reference suites per domain  *(built; live downloads need YOUR check, see below)*
 
-**Automated**
-- `pytest tests/test_domains.py` -- every suite declares target + sensitive attribute for every dataset; loaders return the declared columns; a dataset that needs a manual download raises a clear message naming the folder.
-- `pytest tests/test_domain_runner.py` (small cached fixtures) -- results carry `domain` and `dataset`; aggregation is **within** a domain; fairness metrics are present (the old suite had none); Friedman is skipped, with a reason, when there are too few datasets.
-- `pytest tests/test_cv.py` -- `--cv 5x3` yields 15 scores per metric; the spread (std) is reported; seeds reproduce exactly.
-- `python -m ethikit domains run census --max-datasets 3` -- prints a family x principle table **with a fairness column** and a spread, and ends with the suite's caveats.
-- Language-audit test: a script greps docs and UI strings for "best model" / "most ethical" and fails if one appears without the words "suite" or "this run".
+**Automated** (all offline; none touches your real dataset cache)
 
-**Manual / visual**
-1. Console -> **domain** selector (new): choose *census*; **see** the datasets in the suite, the sensitive attribute for each, and a "caveats" box.
-2. Run it; **see** the graph run the sweep dataset by dataset, then a family table with +/- spreads.
-3. Compare two domains; **see** an explicit "family ordering changes / does not change" table, not a single winner.
-4. Click **use this shortlist on my data**; **see** the configure panel pre-filled with those families and nothing run yet.
-5. Open the field guide's rigor table; **see** numbers that match `results.json` from the same run.
+```bash
+python -m pytest -m "not e2e"     # now ~130 tests
+python -m pytest -m e2e           # 17 browser tests
+```
+
+- `tests/test_domains.py` -- every domain has caveats and an honest size label (`gap`/`single`/`small`/`suite`); thin suites say so; dataset ids are unique; the census suite is tasks x states + Adult; **hiring is an explicit gap, not a synthetic stand-in**; the ACS adapter builds a dataset from PUMS-shaped data for **all five folktables tasks**; the COMPAS adapter applies ProPublica's cleaning and **drops the leaky COMPAS score and race from the features**; fairlearn adapters name the real columns when a schema differs and report network failure clearly; row caps are deterministic and keep the sensitive attribute aligned; the cache round-trips; regression datasets are refused.
+- `tests/test_domain_runner.py` -- profiles are 0-1 for every dataset; **families are averaged inside a family before the suite mean** (a family with more members doesn't count more); leading family + agreement are consistent; real-unit table present; Friedman runs with enough data and is **skipped with a stated reason** when not; **a failing dataset is skipped and reported, not fatal**; if nothing loads, the error lists every reason; thin suites carry an "indicative" note; `--cv` is reproducible; **the shortlist always weighs utility and shows its weights**; `compare_domains` reports agreement and never a winner.
+- `tests/test_cv_and_domain_interfaces.py` -- repeated CV in ordinary runs gives mean +/- spread and is reproducible; the graph animates the first fold only; invalid CV / pre-trained-model-with-CV are rejected; the `ethikit domains` CLI; the streaming `/api/domain-run` endpoint (events, skip, result, errors-as-events, server survives).
+- `tests/test_language_audit.py` -- fails if "best model" / "most ethical" / "winner" appears anywhere in README, docs, UI or code without a negating or scoping qualifier; result classes can't grow a "winner" field.
+- `tests/e2e/test_console.py` -- suite mode hides the my-data rows and rewrites the command; a gap domain disables run and tells you to bring your own data; a suite run shows family evidence, real units, caveats, a skipped dataset greyed out, and the shortlist hands back to my-data mode; `--cv` shows up in the command and the table shows a spread.
+
+**Verified against real data in the build sandbox**: COMPAS (downloaded from GitHub; cleaned to 6,172 rows, the count in ProPublica's published analysis; accuracy about 0.65-0.69, in line with the literature).
+**Not verifiable there (no access to census.gov, OpenML, UCI)**: ACS download, Adult, German Credit, credit-card default, bank marketing, diabetes hospital. They are tested offline on shaped fixtures; **please run the live checks below once on your machine**.
+
+**Live checks -- please run these (need internet once; data is cached afterwards)**
+
+| # | Command | Must happen |
+|---|---|---|
+| L1 | `pip install folktables && python -m ethikit domains run census --max-datasets 1` | downloads one state's ACS file, then a family table; if it fails, the error names the dataset and the fix |
+| L2 | `python -m ethikit domains run census --max-datasets 5` | five tasks for the first state all load (`✓ N rows`); positive rates look plausible (income ~ 0.3-0.5, employment ~ 0.4-0.6) |
+| L3 | `python -m ethikit domains run lending` | three datasets; **any loader whose columns differ from what we assumed fails with the real column list** -- paste me that message and I fix the one line |
+| L4 | `python -m ethikit domains run health` | the diabetes dataset loads; family table with a fairness column |
+| L5 | `python -m ethikit domains run justice` | already verified here: `✓ 5000 rows`, accuracy ~0.65-0.69 |
+| L6 | `python -m ethikit domains run census --cv 3x2 --max-datasets 3` | slower; every number carries a +/- |
+| L7 | run L1 again | instant (served from `~/.cache/ethikit`) |
+| L8 | `python -m ethikit domains run hiring` | exits with a one-line message telling you to bring your own data |
+
+**Manual / visual (console)**
+1. Open the console, choose `--mode reference suite`; **see** the `--data`, `--estimator`, `--model-file` rows disappear and a **domain** row, a **datasets** list (each marked *verified* or *first run on your machine*) and a yellow **caveats** box appear. The command line at the bottom now starts `ethikit domains run census`.
+2. Pick **hiring**; **see** a red `gap` badge, an explanation to bring your own data, and the run button disabled.
+3. Pick **justice**, press run; **see** the dataset row go *running…* then *done · 5000 rows*, then the **reference-suite** tab open with: a relative table (0-1), a "real units" table, a "does the ordering hold up?" table, and caveats saying "one dataset: not cross-dataset evidence". Standard deviations and agreement percentages show `–`, not a fake `0.00` / `100%`.
+4. Pick **census** with `--max-datasets 3`; **see** three rows light up in turn; the tables now show `±` spreads.
+5. Click **use this shortlist on my data**; **see** the page return to *my data & models* with the shortlisted models ticked and nothing run yet.
+6. In *my data* mode type `3x2` in `--cv` and run; **see** `±` on every cell of the comparison table and "cross-validation fold i / n" counting up while the flow graph animates once.
+7. Search the page text for "best" / "most ethical" / "winner"; **see** none presented as a claim.
 
 ## M3 -- Decision support
 

@@ -94,7 +94,8 @@ def config_from_args(a: argparse.Namespace) -> dict:
 
     cfg = {
         "data": data,
-        "split": {"test_size": a.test_size, "seed": a.seed, "scale": not a.no_scale},
+        "split": {"test_size": a.test_size, "seed": a.seed, "scale": not a.no_scale,
+                  "cv": list(_parse_cv(a.cv)) if a.cv else None},
         "models": models or None,
         "tools": a.tools.split(",") if a.tools else None,
         "tool_params": _kv_pairs(a.tool_param, "tool-param"),
@@ -162,9 +163,20 @@ def cmd_run(a: argparse.Namespace) -> int:
     if w:
         obj["weighted_score"] = weighted_score(obj, w).round(3)
         obj = obj.sort_values("weighted_score", ascending=False)
-    print("\n" + B("comparison") + D("  (0-1 per column, 1 = best in this run)"))
+    if s.get("objective_std"):
+        std = pd.DataFrame(s["objective_std"]).T
+        cell = obj.round(3).astype(str).copy()
+        for c in std.columns:
+            if c in cell.columns:
+                cell[c] = [f"{v:.2f} ±{(0 if pd.isna(std.loc[m, c]) else std.loc[m, c]):.2f}" if m in std.index else f"{v:.2f}"
+                           for m, v in obj[c].items()]
+        obj_show = cell
+    else:
+        obj_show = obj.round(3)
+    print("\n" + B("comparison") + D("  (0-1 per column, 1 = best in this run" +
+          (f"; mean ± std over {s['cv'][0]}x{s['cv'][1]} folds" if s.get("cv") else "") + ")"))
     with pd.option_context("display.width", 200, "display.max_columns", 20):
-        print(obj.round(3).to_string())
+        print(obj_show.to_string())
     print("\n" + B("pareto front") + ": " + ", ".join(G(m) for m in s["pareto"]))
 
     os.makedirs(a.out, exist_ok=True)
@@ -248,6 +260,107 @@ def cmd_checklist(a: argparse.Namespace) -> int:
     return 0
 
 
+def _parse_cv(s):
+    if not s:
+        return None
+    try:
+        folds, repeats = s.lower().split("x")
+        return int(folds), int(repeats)
+    except ValueError:
+        raise SystemExit(f"--cv expects FOLDSxREPEATS, e.g. 5x3 (got {s!r})")
+
+
+def _family_pivot(result):
+    """family x principle table of 'mean +/- std' strings, principles in a stable order."""
+    import pandas as pd
+    ft = result.family_table
+    order = [p for p in ["utility", "fairness", "inclusiveness", "explainability", "transparency",
+                         "privacy", "safety"] if p in ft.index.get_level_values("principle")]
+    cell = ft.apply(lambda r: f"{r['mean']:.2f} ±" + ("–" if pd.isna(r["std"]) else f"{r['std']:.2f}"), axis=1)
+    return cell.unstack("principle")[order]
+
+
+def cmd_domains(a: argparse.Namespace) -> int:
+    import pandas as pd
+    from .domains import (STRENGTH_TEXT, compare_domains, get_domains, run_domain, shortlist)
+    from .domains.runner import DomainError
+    states = tuple(s for s in (a.states or "").split(",") if s) or None
+    doms = get_domains(*([states] if states else []))
+    if a.action == "list":
+        for d in doms.values():
+            print(f"{G(d.id):<22} {B(d.title)}  {D('[' + d.strength + ', ' + str(len(d.datasets)) + ' datasets]')}")
+            print(f"{'':<14}{d.blurb}")
+        print(D("\nethikit domains info <id>  ·  ethikit domains run <id>"))
+        return 0
+    if not a.id:
+        raise SystemExit("usage: ethikit domains " + a.action + " <domain-id>   (see: ethikit domains list)")
+    if a.id not in doms:
+        raise SystemExit(f"unknown domain {a.id!r}; choose from {', '.join(doms)}")
+    d = doms[a.id]
+    if a.action == "info":
+        print(B(d.title) + D(f"   [{d.strength}: {STRENGTH_TEXT[d.strength]}]"))
+        print(d.blurb + ("\nFor: " + d.for_whom if d.for_whom else ""))
+        for s in d.datasets:
+            flag = G("verified") if s.verified else Y("first run on your machine")
+            print(f"  - {B(s.id)}  {s.title}\n      source: {s.source}\n      sensitive: {s.sensitive}  "
+                  f"needs: {s.needs}  [{flag}]" + (f"\n      note: {s.note}" if s.note else ""))
+        print(Y("\nCaveats:") + "".join(f"\n  ! {c}" for c in d.caveats))
+        return 0
+
+    log = LiveLog(False)
+
+    def on_event(e):
+        t = D(f"{time.perf_counter() - log.t0:7.1f}s")
+        if e["type"] == "domain_start":
+            print(f"{t} {B('suite')} {e['domain']}  datasets={len(e['datasets'])} models={','.join(e['models'])}"
+                  f" tools={','.join(e['tools'])}" + (f" cv={e['cv'][0]}x{e['cv'][1]}" if e["cv"] else ""))
+        elif e["type"] == "dataset_start":
+            print(f"{t} {B('data')}  [{e['i']}/{e['n']}] {e['title']}")
+        elif e["type"] == "dataset_done":
+            print(f"{t}       {G('✓')} {e['n_rows']} rows, positive rate {e['positive_rate']}, "
+                  f"{e['seconds']}s" + ("" if e["verified"] else D("  (first real run of this loader)")))
+        elif e["type"] == "dataset_skip":
+            print(f"{t}       {R('✗ skipped')} {e['reason']}")
+    try:
+        res = run_domain(d, models=a.models.split(",") if a.models else None,
+                         tools=a.tools.split(",") if a.tools else None, max_datasets=a.max_datasets,
+                         max_rows=a.max_rows, seed=a.seed, cv=_parse_cv(a.cv), on_event=on_event,
+                         use_cache=not a.no_cache)
+    except DomainError as exc:
+        print(R(f"error: {exc}"), file=sys.stderr)
+        return 2
+    print("\n" + B(f"family evidence — {res.title}") + D(f"  (mean ± std over {len(res.datasets)} dataset(s); "
+          "each column 0-1, relative to the models in this suite)"))
+    with pd.option_context("display.width", 220, "display.max_columns", 20):
+        print(_family_pivot(res).to_string())
+    ab = res.absolute_table
+    if not ab.empty:
+        from .domains.runner import KEY_METRICS
+        print("\n" + B("the same families in real units") + D("  (mean over datasets; accuracy/AUC/stability/fidelity: higher is "
+              "better; gaps and MI advantage: lower is better)"))
+        print(ab.rename(columns=KEY_METRICS).round(3).to_string())
+    print("\n" + B("leading family per principle") + D("  (and on what share of datasets it also leads there)"))
+    for p, f in res.top_family.items():
+        print(f"  {p:<15} {G(str(f)):<24} " + ("–" if len(res.datasets) < 2 else f"{res.agreement[p]:.0%}"))
+    print("\n" + B("does the ordering hold up?") + D("  (Friedman over datasets)"))
+    for p, s in res.significance.items():
+        print(f"  {p:<15} " + (D("skipped: " + s["skipped"]) if "skipped" in s else
+              f"p={s['p_value']}  {'significant' if s['significant_at_0.05'] else 'not significant'}"))
+    sl = shortlist(res)
+    print("\n" + B("starting shortlist for your own data") + f": {', '.join(G(f) for f in sl['families'])}"
+          f"  ({', '.join(sl['models'])})\n  " + D("weights: " + ", ".join(f"{k}={v}" for k, v in sl["weights_used"].items())
+          + ". " + sl["caveat"]))
+    for n in res.notes:
+        print(Y("note: " + n))
+    print(Y("\nCaveats:") + "".join(f"\n  ! {c}" for c in res.caveats))
+    os.makedirs(a.out, exist_ok=True)
+    path = os.path.join(a.out, f"domain_{res.domain}.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({**res.to_dict(), "shortlist": sl}, fh)
+    print(f"\n{D('wrote')} {path}")
+    return 0
+
+
 def cmd_serve(a: argparse.Namespace) -> int:
     from .server import serve
     serve(a.host, a.port, a.open)
@@ -326,6 +439,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--weights", help="e.g. fairness=0.5,privacy=0.2 (others keep defaults)")
     r.add_argument("--test-size", type=float, default=0.3)
     r.add_argument("--seed", type=int, default=0)
+    r.add_argument("--cv", help="repeated k-fold instead of one split, e.g. 5x3 = 5 folds x 3 repeats; "
+                   "every score becomes a mean with a spread")
     r.add_argument("--no-scale", action="store_true",
                    help="don't standardise features (use with --model-file trained on raw data)")
     r.add_argument("--checklist", help="answers JSON from `ethikit checklist <id> --out`")
@@ -350,6 +465,20 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--open", action="store_true", help="open a browser tab")
     s.set_defaults(fn=cmd_serve)
+
+    dm = sub.add_parser("domains", help="reference suites: evidence per domain for choosing a starting model")
+    dm.add_argument("action", choices=["list", "info", "run"])
+    dm.add_argument("id", nargs="?", help="domain id (see `ethikit domains list`)")
+    dm.add_argument("--models", help="comma-separated zoo models (default: a representative set)")
+    dm.add_argument("--tools", help="comma-separated tools (default: a fast set without the adversarial attack)")
+    dm.add_argument("--max-datasets", type=int, help="run only the first N datasets of the suite")
+    dm.add_argument("--max-rows", type=int, default=5000, help="cap rows per dataset (default 5000)")
+    dm.add_argument("--states", help="census suite: comma-separated US state codes (default CA,TX,NY)")
+    dm.add_argument("--cv", help="repeated k-fold per dataset, e.g. 5x3 (slower; steadier numbers)")
+    dm.add_argument("--seed", type=int, default=0)
+    dm.add_argument("--no-cache", action="store_true", help="re-download instead of using the local cache")
+    dm.add_argument("--out", default="ethikit_out")
+    dm.set_defaults(fn=cmd_domains)
 
     e = sub.add_parser("export-site", help="copy the console into the docs site with a replay")
     e.add_argument("dir", nargs="?", default="docs")
