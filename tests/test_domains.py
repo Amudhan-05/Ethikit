@@ -48,6 +48,7 @@ def test_hiring_is_an_explicit_gap_not_a_synthetic_stand_in():
 
 @pytest.mark.parametrize("task", S.ACS_TASKS)
 def test_acs_adapter_builds_a_raw_dataset_from_pums_shaped_data(task):
+    pytest.importorskip("folktables", reason="census suite needs `pip install folktables`")
     raw = S.acs_from_pums(fake_pums(task), task, f"{task}_fake")
     assert raw.task == TaskType.CLASSIFICATION and raw.X.shape[0] > 500
     assert set(raw.sensitive) == {"Male", "Female"} and raw.sensitive_name == "SEX"
