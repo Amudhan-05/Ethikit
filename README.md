@@ -8,6 +8,8 @@ that best fits their context.
 
 Built around the principle sets published by **UNESCO, Microsoft, IBM, and Google**.
 
+**Where this is going:** see [ROADMAP.md](ROADMAP.md) -- milestones M1-M7 to completion, each with an exit test.
+
 ## What it is -- and isn't
 
 ethikit is a **model-selection and audit tool built on ethical principles**. It is *not* a
