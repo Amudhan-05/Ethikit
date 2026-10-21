@@ -87,6 +87,7 @@ class ARTRobustnessEvaluator(Evaluator):
         "searched one."
     )
     install_hint = "pip install adversarial-robustness-toolbox"
+    limits = ('A small sample of rows with a tight query budget (see tool parameters): it can miss vulnerabilities a patient attacker would find; L2 perturbations in the scaled feature space only.')
     formula = (
         "for each correctly-classified x: find x' = argmin ‖x' − x‖₂  s.t.  f(x') ≠ f(x)\n"
         "   (HopSkipJump: binary search to the decision boundary + gradient estimate\n"
@@ -158,7 +159,9 @@ class ARTRobustnessEvaluator(Evaluator):
             f"-> adversarial_robustness = 1 - success_rate = {robustness:.4f}."
         )
         trace = make_trace(
-            steps=[f"adversarial_robustness = 1 − {n_flipped}/{n} = {robustness:.4f}"]
+            steps=[f"attack budget: {n} rows, max_iter={self.max_iter}, max_eval={self.max_eval}, "
+                   f"init_eval={self.init_eval}, init_size={self.init_size} (raise with --tool-param art_robustness.<key>=...)",
+                   f"adversarial_robustness = 1 − {n_flipped}/{n} = {robustness:.4f}"]
                   + ([f"perturbation_size = median(‖x'−x‖₂/√{n_features}) over flipped rows "
                       f"= {median_norm:.4f}"] if median_norm is not None else []),
             tables=[{"title": "Every attacked row (test-set index, did the attack flip it, "

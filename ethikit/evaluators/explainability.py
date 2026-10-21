@@ -42,6 +42,7 @@ class ExplainabilityEvaluator(Evaluator):
         "background sample; falls back to the surrogate tree's own "
         "feature_importances_ if SHAP errors or isn't installed."
     )
+    limits = ('Surrogate fidelity says a simple tree can mimic the model, not that the model reasons like the tree; SHAP here is a sampled approximation; no causal claims.')
     formula = (
         "surrogate T = DecisionTree(max_depth=3) fit on (X_test, f(X_test))\n"
         "surrogate_fidelity = mean_i 1[T(x_i) = f(x_i)]       (regression: max(0, R²(f(x), T(x))))\n"

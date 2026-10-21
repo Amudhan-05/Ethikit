@@ -9,7 +9,7 @@ scikit-learn>=1.3
 # Recommended open-source ethics tools (unlock richer evaluators)
 fairlearn>=0.10        # fairness metrics + mitigation
 shap>=0.44             # explainability (feature attributions)
-giskard>=2.0           # unified ML+LLM scan: subgroup performance bias, robustness,
+giskard>=2.0,<3        # 2.19 verified on Py3.12; 3.x pulls numba (NumPy<=1.26 clash) and was non-deterministic here. Unified ML+LLM scan: subgroup performance bias, robustness,
                        # spurious correlation (data-leakage scan not wired in yet)
 aif360>=0.6.1          # 70+ fairness metrics (IBM, Apache-2.0); 0.6.1 installs on
                        # Python 3.11-3.13 -- the old 0.5.x build failure no longer applies

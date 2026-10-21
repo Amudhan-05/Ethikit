@@ -45,6 +45,7 @@ class FairnessEvaluator(Evaluator):
         "only: it never looks at the model's weights or training process, so it can "
         "flag *that* a gap exists between groups but not *why*."
     )
+    limits = ('Group fairness on one declared attribute only (no intersections); demographic parity and equalized odds can conflict, so both cannot generally be zero; says nothing about why a gap exists.')
     formula = (
         "selection_rate(g) = P(ŷ=1 | A=g)\n"
         "TPR(g) = P(ŷ=1 | y=1, A=g)    FPR(g) = P(ŷ=1 | y=0, A=g)\n"

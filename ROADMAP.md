@@ -77,7 +77,7 @@ and spreads; the console can show them; no doc claims a cross-domain finding the
 **Exit:** a user can state requirements, get the feasible set with reasons, see how fragile the
 pick is, and re-run the exact same audit from a config file.
 
-## M4 -- Tool depth  *(HANDOFF Phase 3, finished)*
+## M4 -- Tool depth  *(HANDOFF Phase 3, finished)*  **[BUILT]**
 
 | # | Work | Size |
 |---|---|---|

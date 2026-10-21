@@ -135,6 +135,19 @@ ethikit run ... --export-config my_audit.json                        # save a co
 - **History**: every run is saved locally (`ETHIKIT_RUNS` to move it); diff two runs, or reload
   one's config in the console's *history* tab. *export config* / *import config* do the same by file.
 
+## Tools (13) and the what-if
+
+Every principle a tool can measure has at least two independent tools, and every tool says what
+it does **not** measure (shown in *inspect* and on the model card). `ethikit list tools` lists them.
+
+```bash
+ethikit whatif --models logistic_regression --method exponentiated_gradient --constraint demographic_parity
+ethikit explain --models decision_tree --row 4        # why this one row got its score
+```
+
+The **what-if** trains a fairness-constrained version of a model (fairlearn) and shows the cost
+before and after. It is a counterfactual: it never changes any audit score.
+
 ## Reference suites: choosing a starting model before you have data
 
 No data or trained model of your own yet? A **reference suite** runs the same ethics battery over

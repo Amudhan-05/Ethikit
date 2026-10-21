@@ -29,6 +29,7 @@ class RobustnessEvaluator(Evaluator):
         "perturbation only -- it says nothing about *why* a model is or isn't "
         "stable, and never touches categorical/text features."
     )
+    limits = ("Random Gaussian noise only -- a weak test; worst-case (adversarial) inputs are the art_robustness tool's job; numeric features only.")
     formula = (
         "x̃ = x + ε,  ε_j ~ N(0, (σ · std_j)²)   for every feature j\n"
         "agreement_r = mean_i 1[f(x̃_i) = f(x_i)]          (repeat r = 1..R)\n"

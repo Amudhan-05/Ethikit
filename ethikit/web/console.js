@@ -841,10 +841,11 @@
       "<div>" + r.pareto.map(function (m) { return "<span class='pill'>" + esc(m) + "</span>"; }).join("") + "</div>" +
       "<div class='note'>Scores are relative to this dataset and this split. The same model can score differently on other data — try <code>--synthetic minority_share=0.15</code> or your own CSV, or vary <code>--seed</code>.</div>" +
       (r.notes || []).map(function (n) { return "<div class='note'>" + esc(n) + "</div>"; }).join("") +
-      requirementsHtml(r) + stabilityHtml(r) +
+      requirementsHtml(r) + stabilityHtml(r) + (S.live && r.task === "classification" ? whatifHtml(r) : "") +
       (S.live ? "<p style='margin-top:12px'><a class='btn' href='api/report/" + esc(r.run_id) + "' target='_blank' rel='noopener'>open aggregate report ↗</a></p>" : "") +
       "</div></div>";
     radar($("#radar"), sc);
+    if ($("#wi-run")) $("#wi-run").addEventListener("click", runWhatif);
   }
 
   function requirementsHtml(r) {
@@ -966,9 +967,56 @@
       ts.innerHTML = ""; Object.keys(r.traces[ms.value] || {}).forEach(function (t) { ts.appendChild(el("option", { value: t }, esc(t))); });
       show();
     }
-    function show() { body.innerHTML = ""; body.appendChild(inspectView(ms.value, ts.value)); }
+    function show() { body.innerHTML = ""; body.appendChild(inspectView(ms.value, ts.value)); if (S.live) body.appendChild(rowExplainer(ms.value)); }
     ms.addEventListener("change", fillTools); ts.addEventListener("change", show);
     if (models.length) fillTools(); else body.innerHTML = "<div class='empty'>no traces</div>";
+  }
+
+  function rowExplainer(model) {
+    var d = el("div", { class: "block", style: "margin-top:18px;border-top:1px dashed var(--rule);padding-top:12px" },
+      "<h3>why this one row? (local explanation)</h3><p class='dim small'>Each feature in turn is set to its training mean; the bar is how far " +
+      "the score moves. One feature at a time, so interactions are missed.</p>");
+    var bar = el("div", { class: "ins-bar" });
+    var inp = el("input", { type: "number", min: "0", value: "0", "aria-label": "test row index" });
+    var go = el("button", { class: "btn", type: "button" }, "explain row");
+    var out = el("div");
+    bar.appendChild(el("span", { class: "dim" }, "» ethikit explain --models " + esc(model) + " --row"));
+    bar.appendChild(inp); bar.appendChild(go); d.appendChild(bar); d.appendChild(out);
+    go.addEventListener("click", function () {
+      out.innerHTML = "<span class='dim'>explaining…</span>";
+      fetch("api/explain/" + encodeURIComponent(S.result.run_id) + "/" + encodeURIComponent(model) + "?row=" + (parseInt(inp.value, 10) || 0))
+        .then(function (r) { return r.json(); }).then(function (e) {
+          if (e.error) { out.innerHTML = "<div class='note'>" + esc(e.error) + "</div>"; return; }
+          out.innerHTML = "<p class='prose'>Score <b>" + fmt(e.score) + "</b> (" + esc(e.score_meaning) + ") · predicted " + esc(e.prediction) +
+            " · actual " + esc(e.actual) + (e.group != null ? " · group " + esc(e.group) : "") + "</p>";
+          out.appendChild(chart({ title: "contribution to this row's score", type: "bars",
+            labels: e.contributions.map(function (c) { return c.feature; }),
+            series: [{ name: "contribution", values: e.contributions.map(function (c) { return c.contribution; }) }] }));
+        }).catch(function (err) { out.innerHTML = "<div class='note'>" + esc(err.message) + "</div>"; });
+    });
+    return d;
+  }
+
+  function whatifHtml(r) {
+    var models = Object.keys(r.objective);
+    return "<h3 style='margin-top:14px'>what if we mitigate? <span class='pill gold'>counterfactual — not part of the audit</span></h3>" +
+      "<p class='prose small'>Trains a fairness-constrained version of one model with fairlearn and shows the cost. Nothing here changes any score above.</p>" +
+      "<div class='ins-bar'><select id='wi-model' aria-label='model'>" + models.map(function (m) { return "<option>" + esc(m) + "</option>"; }).join("") + "</select>" +
+      "<select id='wi-method' aria-label='method'><option value='exponentiated_gradient'>exponentiated gradient (retrain)</option><option value='threshold_optimizer'>threshold optimizer (post-process)</option></select>" +
+      "<select id='wi-constraint' aria-label='constraint'><option value='demographic_parity'>demographic parity</option><option value='equalized_odds'>equalized odds</option></select>" +
+      "<button class='btn' id='wi-run' type='button'>run what-if</button></div><div id='wi-out'></div>";
+  }
+  function runWhatif() {
+    var out = $("#wi-out"); out.innerHTML = "<span class='dim'>training the constrained model…</span>";
+    fetch("api/whatif", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: S.result.run_id, model: $("#wi-model").value, method: $("#wi-method").value, constraint: $("#wi-constraint").value }) })
+      .then(function (r) { return r.json(); }).then(function (w) {
+        if (w.error) { out.innerHTML = "<div class='note'>" + esc(w.error) + "</div>"; return; }
+        var rows = Object.keys(w.before).map(function (k) { var d = w.delta[k]; var better = /diff/.test(k) ? d < 0 : d > 0;
+          return "<tr><td>" + esc(k) + "</td><td>" + fmt(w.before[k]) + "</td><td>" + fmt(w.after[k]) + "</td><td class='" + (d === 0 ? "" : better ? "ok" : "err") + "'>" + (d > 0 ? "+" : "") + fmt(d) + "</td></tr>"; }).join("");
+        out.innerHTML = "<p class='prose'>" + esc(w.summary) + "</p><div class='tscroll'><table class='t'><tr><th>metric</th><th>before</th><th>after</th><th>change</th></tr>" + rows + "</table></div>" +
+          "<div class='note'><div>uses the sensitive attribute " + esc(w.uses_sensitive_attribute) + "</div>" + w.caveats.map(function (c) { return "<div>! " + esc(c) + "</div>"; }).join("") + "</div>";
+      }).catch(function (e) { out.innerHTML = "<div class='note'>" + esc(e.message) + "</div>"; });
   }
 
   function inspectView(model, tool) {
@@ -980,6 +1028,7 @@
     left.innerHTML =
       "<div class='block'><h3>what it does</h3><p class='prose'>" + esc(meta.mechanism || "") + "</p></div>" +
       "<div class='block'><h3>the maths</h3><pre class='code'>" + esc(tr.formula || meta.formula || "") + "</pre></div>" +
+      ((tr.limits || meta.limits) ? "<div class='block'><h3>what this does not measure</h3><div class='note'>" + esc(tr.limits || meta.limits) + "</div></div>" : "") +
       (t.steps && t.steps.length ? "<div class='block'><h3>worked through, this run</h3><ol class='steps'>" +
         t.steps.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ol></div>" : "") +
       "<div class='block'><h3>measurements</h3><div class='tscroll'><table class='t'><tr><th>metric</th><th>principle</th><th>inspects</th><th>value</th><th>better</th></tr>" +
@@ -1007,22 +1056,28 @@
     var d = el("div", { class: "block" }, "<h3>" + esc(c.title) + "</h3>");
     var labels = c.labels || []; var series = c.series || [];
     var W = 520, H = 200, L = 40, B = 34, T = 8;
-    var max = 0; series.forEach(function (s) { s.values.forEach(function (v) { if (v > max) max = v; }); });
-    max = max || 1;
+    // value axis spans [min(0, smallest), max(0, largest)] so negative values (e.g. a feature that
+    // pushes a score down) draw below a zero line instead of as invisible negative-height bars
+    var max = 0, min = 0;
+    series.forEach(function (s) { s.values.forEach(function (v) { if (v > max) max = v; if (v < min) min = v; }); });
+    if (max === min) max = 1;
+    var plotH = H - B - T;
+    function y(v) { return T + plotH * (max - v) / (max - min); }
     var g = svg("svg", { viewBox: "0 0 " + W + " " + H, class: "chart", width: "100%", role: "img", "aria-label": c.title });
-    svg("line", { class: "axis", x1: L, y1: H - B, x2: W - 4, y2: H - B }, g);
+    svg("line", { class: "axis", x1: L, y1: y(0), x2: W - 4, y2: y(0) }, g);
     svg("line", { class: "axis", x1: L, y1: T, x2: L, y2: H - B }, g);
-    [0, 0.5, 1].forEach(function (f) {
-      var t = svg("text", { x: L - 4, y: H - B - f * (H - B - T) + 3, "text-anchor": "end" }, g); t.textContent = fmt(max * f);
+    (min < 0 ? [min, 0, max] : [0, max / 2, max]).forEach(function (v) {
+      var t = svg("text", { x: L - 4, y: y(v) + 3, "text-anchor": "end" }, g); t.textContent = fmt(v);
     });
     var n = labels.length || 1; var slot = (W - L - 8) / n;
     var overlay = c.type === "hist";
     var bw = overlay ? slot * 0.9 : slot * 0.8 / Math.max(series.length, 1);
     series.forEach(function (s, si) {
       s.values.forEach(function (v, i) {
-        var h = (H - B - T) * (v / max);
+        var top = Math.min(y(v), y(0)), h = Math.abs(y(v) - y(0));
         var x = L + 4 + i * slot + (overlay ? 0 : si * bw);
-        var b = svg("rect", { x: x, y: H - B - h, width: Math.max(1, bw - 1), height: h, class: "bar s" + ([0, 1, 2, 3][si] || si) }, g);
+        var b = svg("rect", { x: x, y: top, width: Math.max(1, bw - 1), height: Math.max(h, 0.5),
+                              class: "bar s" + ([0, 1, 2, 3][si] || si) + (v < 0 ? " neg" : "") }, g);
         if (overlay) b.setAttribute("fill-opacity", "0.55");
         var tt = svg("title", null, b); tt.textContent = s.name + " · " + labels[i] + ": " + fmt(v);
       });

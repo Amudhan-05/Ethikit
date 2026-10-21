@@ -164,6 +164,8 @@ def _trace_html(tool: str, t: dict) -> str:
              f"numbers, intermediate tables</summary><div>"]
     if t.get("formula"):
         parts.append(f"<pre>{esc(t['formula'])}</pre>")
+    if t.get("limits"):
+        parts.append(f"<p class='muted'><b>What this does not measure:</b> {esc(t['limits'])}</p>")
     if tr.get("steps"):
         parts.append("<ol class='steps'>" + "".join(f"<li>{esc(x)}</li>" for x in tr["steps"])
                      + "</ol>")

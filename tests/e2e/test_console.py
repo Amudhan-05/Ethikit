@@ -239,3 +239,44 @@ def test_export_then_import_config_roundtrip(page, tmp_path):
     page.set_input_files("#import-config", str(path))
     page.wait_for_function("document.querySelector('#cv').value === '3x2'")
     assert page.inner_text("#cmd-preview") == cmd_before
+
+
+# ------------------------------------------------------------------ M4: tool depth
+def test_whatif_panel_is_labelled_a_counterfactual_and_shows_the_cost(page):
+    _light_tools(page)
+    page.click("#run")
+    page.wait_for_function("document.querySelector('#run-label').textContent.length > 0", timeout=120000)
+    assert "counterfactual" in page.inner_text("#tab-results").lower()
+    page.select_option("#wi-model", "logistic_regression")
+    page.select_option("#wi-method", "threshold_optimizer")
+    page.click("#wi-run")
+    page.wait_for_selector("#wi-out table.t", timeout=60000)
+    txt = page.inner_text("#wi-out")
+    assert "demographic_parity_diff" in txt and "prediction time" in txt
+    assert not page.errors, page.errors
+
+
+def test_inspect_explains_one_row_and_states_limits(page):
+    _light_tools(page)
+    page.click("#run")
+    page.wait_for_function("document.querySelector('#run-label').textContent.length > 0", timeout=120000)
+    page.click("[data-tab=inspect]")
+    assert "what this does not measure" in page.inner_text("#tab-inspect").lower()
+    page.fill("#tab-inspect input[type=number]", "5")
+    page.click("text=explain row")
+    page.wait_for_selector("#tab-inspect .chart rect.bar", timeout=30000)
+    assert "Score" in page.inner_text("#tab-inspect")
+    assert not page.errors, page.errors
+
+
+def test_charts_never_draw_negative_heights(page):
+    """Regression: negative values used to become invisible negative-height bars."""
+    _light_tools(page)
+    page.click("#run")
+    page.wait_for_function("document.querySelector('#run-label').textContent.length > 0", timeout=120000)
+    page.click("[data-tab=inspect]")
+    page.fill("#tab-inspect input[type=number]", "5")
+    page.click("text=explain row")
+    page.wait_for_selector("#tab-inspect .chart rect.bar", timeout=30000)
+    heights = page.eval_on_selector_all("svg.chart rect", "els => els.map(e => parseFloat(e.getAttribute('height')))")
+    assert heights and min(heights) > 0

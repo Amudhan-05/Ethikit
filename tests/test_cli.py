@@ -58,3 +58,12 @@ def test_checklist_template_and_attach(tmp_path):
                      "--checklist", str(f), "--out", str(out)]) == 0
     card = (out / "model_cards" / "decision_tree.html").read_text()
     assert "Deon data-science ethics checklist" in card and "A.1" in card
+
+
+def test_cli_whatif_and_explain(capsys):
+    pytest.importorskip("fairlearn")
+    assert cli.main(["whatif", "--models", "logistic_regression,knn"]) == 0
+    out = capsys.readouterr().out
+    assert "counterfactual" in out and "parity gap" in out and "knn" in out and "skipped" in out
+    assert cli.main(["explain", "--models", "decision_tree", "--row", "2"]) == 0
+    assert "occlusion" in capsys.readouterr().out

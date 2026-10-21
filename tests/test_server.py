@@ -119,3 +119,14 @@ def test_history_endpoints(server):
     assert json.loads(get(f"{server}/api/runs/{a}")[2])["config"]["models"] == SMALL["models"]
     d = json.loads(get(f"{server}/api/runs-diff?a={a}&b={b}")[2])
     assert d["config_changes"]
+
+
+def test_whatif_and_explain_endpoints(server):
+    pytest.importorskip("fairlearn")
+    res = run_stream(server, {**SMALL, "models": [{"name": "logistic_regression"}]})[-1]
+    with post(server + "/api/whatif", {"run_id": res["run_id"], "model": "logistic_regression",
+                                       "method": "threshold_optimizer"}) as r:
+        w = json.loads(r.read())
+    assert w["label"].startswith("counterfactual") and w["after"]["demographic_parity_diff"] < w["before"]["demographic_parity_diff"]
+    e = json.loads(get(f"{server}/api/explain/{res['run_id']}/logistic_regression?row=3")[2])
+    assert e["row"] == 3 and e["contributions"]

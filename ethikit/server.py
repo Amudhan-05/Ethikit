@@ -49,6 +49,21 @@ MODELS: Dict[str, Any] = {}
 RUNS: Dict[str, dict] = {}
 
 
+def _fitted(run: dict, name: str):
+    """The fitted model for local explanations: pre-trained uploads as-is, otherwise refit from the
+    run's own factory on the run's own training split (deterministic seeds) and cache it."""
+    cache = run.setdefault("fitted", {})
+    if name not in cache:
+        p = run["prepared"]
+        if name in p.prefit:
+            cache[name] = p.prefit[name]
+        elif name in p.factories:
+            cache[name] = p.factories[name]().fit(p.dataset.X_train, p.dataset.y_train)
+        else:
+            raise KeyError(f"no model {name!r} in this run")
+    return cache[name]
+
+
 def describe_frame(df: pd.DataFrame) -> dict:
     cols = []
     for c in df.columns:
@@ -120,6 +135,12 @@ class Handler(BaseHTTPRequestHandler):
                 from .runs import diff_runs
                 q = parse_qs(url.query)
                 return self._json(diff_runs(q["a"][0], q["b"][0]))
+            if path.startswith("/api/explain/"):
+                from .explain import explain_row
+                _, _, _, run_id, model = path.split("/", 4)
+                run = RUNS[run_id]
+                row = int(parse_qs(url.query).get("row", ["0"])[0])
+                return self._json(explain_row(_fitted(run, model), run["prepared"].dataset, row))
             if path.startswith("/api/report/"):
                 run = RUNS[path.rsplit("/", 1)[1]]
                 s = run["summary"]
@@ -173,6 +194,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._run(json.loads(self._body() or b"{}"))
             if url.path == "/api/domain-run":
                 return self._domain_run(json.loads(self._body() or b"{}"))
+            if url.path == "/api/whatif":
+                from .mitigation import mitigate
+                body = json.loads(self._body() or b"{}")
+                run = RUNS[body["run_id"]]
+                p = run["prepared"]
+                if body["model"] not in p.factories:
+                    raise ValueError("the what-if retrains the model, so it needs a zoo model or estimator, "
+                                     "not a pre-trained upload")
+                return self._json(mitigate(p.dataset, p.factories[body["model"]], body.get("method", "exponentiated_gradient"),
+                                           body.get("constraint", "demographic_parity"), seed=p.dataset_seed))
             if url.path.startswith("/api/checklist/"):
                 run_id = url.path.rsplit("/", 1)[1]
                 data = json.loads(self._body() or b"{}")

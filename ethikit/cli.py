@@ -305,6 +305,51 @@ def cmd_profile(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_whatif(a: argparse.Namespace) -> int:
+    from . import session
+    from .mitigation import mitigate
+    cfg = config_from_args(a)
+    cfg["save"] = False
+    prepared = session.prepare(cfg)
+    names = list(prepared.factories)
+    if not names:
+        raise SystemExit("choose at least one model with --models")
+    print(B("what-if: mitigation") + D("  (a counterfactual -- NOT part of the audit; nothing here changes any score)"))
+    for m in names:
+        try:
+            r = mitigate(prepared.dataset, prepared.factories[m], a.method, a.constraint, seed=a.seed)
+        except ValueError as exc:
+            print(f"  {m:<22} {R('skipped')}: {exc}")
+            continue
+        print(f"\n  {B(m)}  {r['summary']}")
+        for k in r["before"]:
+            d = r["delta"][k]
+            print(f"    {k:<26} {r['before'][k]:<8} -> {r['after'][k]:<8} ({d:+.4f})")
+        print(D("    uses the sensitive attribute " + r["uses_sensitive_attribute"]))
+        for c in r["caveats"]:
+            print(Y("    ! " + c))
+    return 0
+
+
+def cmd_explain(a: argparse.Namespace) -> int:
+    from . import session
+    from .explain import explain_row
+    cfg = config_from_args(a)
+    cfg["save"] = False
+    p = session.prepare(cfg)
+    name = (a.models or "").split(",")[0]
+    if name not in p.factories and name not in p.prefit:
+        raise SystemExit("choose one model with --models NAME (or --model-file NAME=PATH)")
+    model = p.prefit.get(name) or p.factories[name]().fit(p.dataset.X_train, p.dataset.y_train)
+    e = explain_row(model, p.dataset, a.row)
+    print(B(f"why {name} scored test row {a.row} {e['score']}") + D(f"  ({e['score_meaning']}; actual {e['actual']}, group {e['group']})"))
+    for c in e["contributions"]:
+        bar = ("+" if c["contribution"] >= 0 else "-") * min(40, int(abs(c["contribution"]) * 100))
+        print(f"  {c['feature']:<30} {c['contribution']:+.4f}  {bar}")
+    print(D("  " + e["method"] + ". Limits: " + e["limits"]))
+    return 0
+
+
 def cmd_runs(a: argparse.Namespace) -> int:
     from .runs import diff_runs, list_runs, load_run, runs_dir
     if a.action == "list":
@@ -610,6 +655,28 @@ def build_parser() -> argparse.ArgumentParser:
                      require=None, no_save=True).items():
         pf.set_defaults(**{k: v})
     pf.set_defaults(fn=cmd_profile)
+
+    def _data_flags(sp):
+        for k, v in dict(family=None, model_param=None, estimator=None, model_file=None, tools=None,
+                         tool_param=None, weights=None, test_size=0.3, no_scale=False, cv=None, checklist=None,
+                         require=None, no_save=True, synthetic=None, target=None, sensitive=None,
+                         sensitive_threshold=None, positive_label=None, exclude_sensitive=False).items():
+            sp.set_defaults(**{k: v})
+        sp.add_argument("--data", default="synthetic")
+        sp.add_argument("--target"); sp.add_argument("--sensitive")
+        sp.add_argument("--models", help="comma-separated model names")
+        sp.add_argument("--seed", type=int, default=0)
+
+    wf = sub.add_parser("whatif", help="counterfactual: what would closing a fairness gap cost? (not part of the audit)")
+    _data_flags(wf)
+    wf.add_argument("--method", choices=["exponentiated_gradient", "threshold_optimizer"], default="exponentiated_gradient")
+    wf.add_argument("--constraint", choices=["demographic_parity", "equalized_odds"], default="demographic_parity")
+    wf.set_defaults(fn=cmd_whatif)
+
+    ex = sub.add_parser("explain", help="why did a model score one test row the way it did? (occlusion)")
+    _data_flags(ex)
+    ex.add_argument("--row", type=int, default=0)
+    ex.set_defaults(fn=cmd_explain)
 
     rh = sub.add_parser("runs", help="saved run history: list, show, diff")
     rh.add_argument("action", choices=["list", "show", "diff"])

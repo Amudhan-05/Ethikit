@@ -297,7 +297,7 @@ def catalogue() -> Dict[str, Any]:
         tools.append({"name": ev.name, "principles": list(ev.principle_ids),
                       "available": ev.available(), "install_hint": ev.install_hint,
                       "mechanism": ev.mechanism,
-                      "formula": ev.formula, "params": jsonable(ev.params()),
+                      "formula": ev.formula, "params": jsonable(ev.params()), "limits": ev.limits,
                       "supports": [t.value for t in ev.supports]})
     def zoo(reg):
         return {fam: {m: jsonable({k: (v if isinstance(v, (bool, int, float, str, type(None)))

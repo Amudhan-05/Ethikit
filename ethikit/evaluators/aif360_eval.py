@@ -72,6 +72,7 @@ class AIF360Evaluator(Evaluator):
         "and an individual-level inequality measure fairlearn doesn't compute."
     )
     install_hint = "pip install aif360"
+    limits = ('Binarises the sensitive attribute (privileged = highest training base rate vs everyone else); the 80% rule is a legal heuristic, not an ethical standard.')
     formula = (
         "P = privileged group, U = unprivileged group\n"
         "disparate_impact = P(ŷ=1 | U) / P(ŷ=1 | P)             (1 = parity; < 0.8 fails the 80% rule)\n"

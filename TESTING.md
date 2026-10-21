@@ -154,19 +154,60 @@ python -m pytest -m e2e -k "requirement or profile or history or export"
 | M3.11 | **export config**, reload the page, **import config** with that file | the command line comes back identical |
 | M3.12 | Open a model card of a failing model | "Requirements you set" with *does not meet* and the reason; "What the data says (before any model)" |
 
-## M4 -- Tool depth
+## M4 -- Tool depth  *(built)*
 
 **Automated**
-- `pytest tests/test_evaluator_contract.py` -- a single parametrised test over every registered evaluator: has `formula`, `mechanism`, `principle_ids`, a trace with at least one step, values in range, deterministic for a fixed seed. A new tool that breaks the contract fails here.
-- `pytest tests/test_mitigation.py` -- fairlearn mitigation improves the target gap on the biased synthetic set and **never** writes into the audit scores (it is returned separately).
-- `pytest tests/test_calibration.py` -- a perfectly calibrated toy predictor scores ECE ~ 0; an overconfident one scores higher.
-- `python -m ethikit coverage` -- every tool-addressable principle lists **two or more** tools.
+
+```bash
+python -m pytest tests/test_m4_tools.py tests/test_evaluators.py
+python -m pytest -m e2e -k "whatif or explains or negative"
+```
+
+- `tests/test_m4_tools.py` -- every new tool checked against a case whose answer is known:
+  calibration ECE < 0.02 for a calibrated model and > 0.2 for an overconfident one, and the
+  per-group gap catches a group whose scores are 0.3 too high; worst-group accuracy equals a
+  hand computation; permutation importance sees **direct** use of the sensitive attribute and
+  reports exactly 0 when it is not an input; attribute inference is small for an honest model and
+  large when the output encodes the group; **every tool-addressable principle has >= 2 tools and
+  every tool states what it does not measure**; the ART trace states its attack budget; the
+  mitigation what-if halves the targeted gap, is reproducible, refuses clearly (kNN can't be
+  re-weighted) and **never changes the audit**; the local explanation finds the deciding feature.
+- `tests/test_evaluators.py` -- the contract (formula, mechanism, trace, determinism) now covers
+  13 tools; with `pip install -r requirements.txt` on Python 3.12 all 13 are available and pass,
+  including Giskard, ART and drift detection.
+- Server + CLI: `/api/whatif`, `/api/explain`, `ethikit whatif`, `ethikit explain`.
+- e2e: the what-if panel is labelled a counterfactual and shows before/after; inspect states
+  each tool's limits and explains one row; charts never draw negative heights.
+
+**New tools** (13 in total; each says what it does *not* measure):
+
+| Tool | Principles | Metric(s) |
+|---|---|---|
+| calibration | safety, fairness | expected_calibration_error; calibration_gap_between_groups |
+| subgroup_performance | inclusiveness, fairness | worst_group_accuracy; accuracy_gap_between_groups |
+| permutation_importance | explainability, transparency | importance_concentration; sensitive_feature_reliance |
+| attribute_inference | privacy | attribute_inference_gain (second privacy attack) |
+
+**Bugs found and fixed while building M4**
+- Charts drew negative values as invisible negative-height bars; they now draw below a zero line in red.
+- A long "not installed — pip install …" hint widened a tool chip past a phone screen.
+- `giskard` 3.x (allowed by the old `>=2.0` pin) pulls in numba, which breaks ART and alibi-detect
+  on NumPy 2, and was not deterministic; pinned `giskard<3` (2.19 verified).
 
 **Manual / visual**
-1. Flow graph: each tool-addressable principle box shows at least two tool chips.
-2. Open a mitigation what-if; **see** it labelled "counterfactual -- not part of the audit" and a before/after fairness vs utility chart.
-3. Inspect the calibration tool; **see** a reliability diagram close to the diagonal for a well-calibrated model.
-4. Inspect SHAP and the second explainer on the same model; **see** the top features roughly agree, or an honest note where they do not.
+
+| # | Do | You must see |
+|---|---|---|
+| M4.1 | `python -m ethikit list tools` | 13 tools; with the full install none is "not installed" |
+| M4.2 | `python -m ethikit run --trace --models logistic_regression --tools calibration,subgroup_performance,permutation_importance,attribute_inference` | each tool's formula and worked steps, with real numbers |
+| M4.3 | `python -m ethikit whatif --models logistic_regression,knn` | a "counterfactual -- NOT part of the audit" header; parity gap falling (about 0.45 -> 0.04) with an accuracy cost (about 0.79 -> 0.74); kNN *skipped* with the reason |
+| M4.4 | same with `--method threshold_optimizer` | an extra warning that it uses the sensitive attribute at prediction time |
+| M4.5 | `python -m ethikit explain --models decision_tree --row 4` | a signed bar per feature and the method's limits |
+| M4.6 | Console: run, scroll **results** to "what if we mitigate?" | a gold *counterfactual* badge; pick a model, method, constraint -> before/after table with green/red changes and caveats; the comparison table above does **not** change |
+| M4.7 | Console **inspect**: any tool | a "what this does not measure" box under the maths |
+| M4.8 | Console **inspect** -> "explain row" with row 5 | a bar chart; negative contributions in red below a zero line |
+| M4.9 | Console **inspect** -> `art_robustness` | the first worked step lists the attack budget |
+| M4.10 | Model card -> "How each number was computed" | every tool shows "What this does not measure" |
 
 ## M5 -- Deep learning
 
