@@ -13,7 +13,7 @@ network at build time to fetch a dataset (the app itself stays offline-capable).
 
 ---
 
-## M1 -- Trust the foundation (tests, CI, honest data)  *(do first; everything else leans on it)*
+## M1 -- Trust the foundation (tests, CI, honest data)  **[DONE]**
 
 | # | Work | Size |
 |---|---|---|

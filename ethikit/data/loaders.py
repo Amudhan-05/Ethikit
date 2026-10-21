@@ -148,18 +148,24 @@ def load_adult_raw(seed: int = 0) -> RawData:
     try:
         from sklearn.datasets import fetch_openml
         data = fetch_openml("adult", version=2, as_frame=True)
-        df = data.frame.dropna()
-        y = (df["class"].astype(str).str.contains(">50K")).astype(int).to_numpy()
-        sensitive = df["sex"].astype(str).values
-        feats = df.drop(columns=["class"]).select_dtypes(include="number")  # keep it simple
-        _ADULT_RAW_CACHE = RawData(
-            X=feats.to_numpy(dtype=float), y=y, sensitive=sensitive, sensitive_name="sex",
-            feature_names=list(feats.columns), name="adult_income", task=TaskType.CLASSIFICATION,
-        )
+        _ADULT_RAW_CACHE = adult_from_frame(data.frame)
     except Exception as exc:  # no network / offline demo
         print(f"[loaders] Adult unavailable ({type(exc).__name__}); using synthetic data.")
         _ADULT_RAW_CACHE = _synthetic_raw(seed=seed)
     return _ADULT_RAW_CACHE
+
+
+def adult_from_frame(df) -> RawData:
+    """UCI Adult as a RawData, categoricals included (workclass, education, marital-status,
+    occupation, relationship, race, sex, native-country are one-hot encoded; levels beyond
+    the top 20 collapse to 'other'). Target: income >50K = 1. Sensitive attribute: sex.
+    `sex` stays in the feature set, like the synthetic data's `group` column, so the audit
+    reflects a model that can see it; use `--exclude-sensitive` on your own CSVs to test
+    fairness-through-unawareness."""
+    df = df.dropna()
+    df = df.assign(**{"class": df["class"].astype(str).str.strip().str.rstrip(".")})
+    return prepare_frame(df, target="class", sensitive="sex", positive_label=">50K",
+                         name="adult_income")
 
 
 def load_adult(seed=0) -> Dataset:

@@ -26,6 +26,7 @@ import pandas as pd
 from .theme import BASE, head_assets
 from .. import checklists as checklists_mod
 from .. import coverage as coverage_mod
+from ..evaluators.base import all_evaluators
 from .. import principles as principles_mod
 from ..benchmark.models import family_of, flat_classifiers
 
@@ -104,6 +105,9 @@ def _card_data(model_name: str, dataset_name: str, sensitive_name: Optional[str]
         "pareto_optimal": in_pareto,
         "governance_only_principles": _governance_only_principles(),
         "tool_coverage": _tool_coverage_for_card(metrics),
+        "tools_not_run": [{"name": ev.name, "principles": list(ev.principle_ids),
+                           "hint": ev.install_hint}
+                          for ev in all_evaluators() if not ev.available()],
     }
 
 
@@ -258,6 +262,15 @@ def _render_card_html(card: Dict[str, object]) -> str:
     traces = "".join(_trace_html(tool, t) for tool, t in card.get("traces", {}).items()) or (
         "<p class='muted'>No traces recorded for this run.</p>")
     checklist = _checklist_html(card.get("checklist"))
+    not_run = ""
+    if card.get("tools_not_run"):
+        not_run = ("<h2>Tools that did not run</h2><p class='muted'>These registered tools were "
+                   "unavailable on the machine that produced this card, so their principles may be "
+                   "less well evidenced than a full install would give.</p><table><tr><th>Tool</th>"
+                   "<th>Principles</th><th>To enable</th></tr>" + "".join(
+                       f"<tr><td>{esc(t['name'])}</td><td>{esc(', '.join(t['principles']))}</td>"
+                       f"<td><code>{esc(t['hint'] or 'see requirements.txt')}</code></td></tr>"
+                       for t in card["tools_not_run"]) + "</table>")
 
     return f"""<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -299,6 +312,7 @@ but weren't the source of these numbers (grey) -- a second opinion is one <code>
 call away. Full reverse map: <code>ethikit.coverage.principle_to_tools()</code>.</p>
 <table><tr><th>Principle</th><th>Used here</th><th>Also available</th></tr>{coverage_rows}</table>
 
+{not_run}
 <h2>Ethical considerations</h2>
 <p>Metrics above cover only <i>tool-addressable</i> principles -- the ones a library can
 measure from data, model internals, predictions, or behaviour. The following principles

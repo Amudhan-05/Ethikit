@@ -194,7 +194,8 @@ def catalogue() -> Dict[str, Any]:
     tools = []
     for ev in all_evaluators():
         tools.append({"name": ev.name, "principles": list(ev.principle_ids),
-                      "available": ev.available(), "mechanism": ev.mechanism,
+                      "available": ev.available(), "install_hint": ev.install_hint,
+                      "mechanism": ev.mechanism,
                       "formula": ev.formula, "params": jsonable(ev.params()),
                       "supports": [t.value for t in ev.supports]})
     def zoo(reg):

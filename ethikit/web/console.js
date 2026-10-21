@@ -229,8 +229,8 @@
     S.meta.tools.forEach(function (t) {
       var c = chip(t.name, S.tools.has(t.name), !t.available, function (on) {
         on ? S.tools.add(t.name) : S.tools.delete(t.name); renderAdvanced(); update();
-      }, t.available ? t.principles.join("+") : "not installed");
-      c.title = t.mechanism;
+      }, t.available ? t.principles.join("+") : "not installed — " + (t.install_hint || ""));
+      c.title = t.available ? t.mechanism : "Not installed. To enable: " + (t.install_hint || "see requirements.txt") + "\n\n" + t.mechanism;
       box.appendChild(c);
     });
     renderAdvanced();

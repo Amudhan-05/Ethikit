@@ -43,21 +43,40 @@ All checks run locally. Use Python 3.12 (the standard for this project). Start t
 
 ---
 
-## M1 -- Trust the foundation
+## M1 -- Trust the foundation  *(built; these checks pass today)*
 
 **Automated**
-- `pytest tests/test_scoring.py` -- `normalize` puts every metric in [0,1] with 1 = best (incl. lower-is-better metrics); `pareto_front` returns no dominated model; `weighted_score` ignores unknown keys and sums weights to 1.
-- `pytest tests/test_evaluators.py` -- for **every registered evaluator** on a tiny synthetic set: values are finite and in a sane range, `mechanism` and `formula` are non-empty, a `trace` is present.
-- `pytest tests/test_fallbacks.py` -- numpy fallback and fairlearn agree to 1e-9 on the same predictions.
-- `pytest tests/test_loaders.py` -- `prepare_frame`: NaNs imputed, many-level categoricals collapse to "other", numeric sensitive column splits at the median, single-class target raises a clear error, Adult now includes categorical columns.
-- `pytest tests/test_checklists.py` -- unanswered items count as "not evidenced", `n/a` excluded, scores in [0,1].
-- `pytest tests/e2e/test_console.py` -- Playwright: a full run finishes, weights re-order without a new run, inspect shows a formula, a checklist attaches to the card, no console errors, in both themes.
-- CI (GitHub Actions) runs all of the above on Python 3.12 -- green badge in the README.
+
+```bash
+pip install -r requirements-dev.txt          # once; plus `playwright install chromium` for e2e
+python -m pytest -m "not e2e"                # 73 tests, ~7 s: scoring, every tool, fallbacks, loaders, checklists, runner, CLI, server API
+python -m pytest -m e2e                      # 11 browser tests, ~30 s: the real console in headless Chromium, dark and light
+```
+
+What each file guarantees:
+- `tests/test_scoring.py` -- every metric is oriented so 1 = best (lower-is-better flipped); a constant metric is 1.0 not NaN; error rows dropped; the Pareto front never contains a dominated model and keeps ties; weights are normalised and unknown keys ignored.
+- `tests/test_evaluators.py` -- **the contract, for every registered tool**: finite values, known principle, a formula, a run-specific mechanism, a trace with worked steps, and **identical results for a fixed seed**. Also: unavailable tools must give an install hint; more noise never makes the model look more stable; regression data runs.
+- `tests/test_fallbacks.py` -- the numpy fairness paths agree with fairlearn to 1e-9.
+- `tests/test_loaders.py` -- `prepare_frame`: NaNs, positive-label rules, many-level categoricals -> "other", numeric sensitive columns split at the median or a threshold, `--exclude-sensitive`, regression inferred, single-class / unknown-column / too-few-rows errors; Adult now has categorical columns; scaling uses train statistics only; synthetic knobs actually change the data.
+- `tests/test_checklists.py` -- every item maps to a real principle; scoring of yes/partial/no/n-a/unanswered; answers-file validation; markdown export.
+- `tests/test_runner_session.py` -- event order, per-tool traces, a crashing tool doesn't break the sweep, pre-fitted models are not refit, bad tool/param names give helpful errors, weights drive the order, regression and custom-synthetic runs.
+- `tests/test_cli.py` -- flags become the same config the console builds; one-line errors, never a traceback; a full run writes report, cards and results; a checklist reaches the card.
+- `tests/test_server.py` -- the real server: static types, docs served locally, **path traversal blocked**, NDJSON run stream, bad config -> error event (server survives), CSV upload then run, card/report endpoints, checklist attach.
+- `tests/e2e/test_console.py` -- theme toggle persists and returns to auto; the `ethikit run` line follows clicks; a run lights up the graph; **changing a weight re-orders the table without re-running** and the top row is really the best on that principle; inspect shows a formula and steps; a checklist attaches to the model card; no sideways scroll on a phone; no console errors in either theme.
+
+**These tests were checked to be able to fail**: deliberately breaking normalisation, deleting a tool's formula, and disconnecting the weight re-render each made the matching test fail.
+
+**Bugs the new tests found and that are now fixed**
+- The HopSkipJump attack gave different numbers on identical runs (ART builds an unseeded random generator internally), so `--seed` didn't make audits reproducible. It is now seeded for the duration of the attack.
+- Adult previously used numeric columns only; it now includes the categorical ones (workclass, education, race, sex, ...).
 
 **Manual / visual**
-1. Run `pytest -q`; **see** a summary line with 0 failures.
-2. Start the console with a tool deliberately uninstalled (`pip uninstall -y aif360`); **see** that chip greyed with "not installed" and a hint on how to install it; the run still completes.
-3. Run on Adult; **see** categorical columns (e.g. `workclass=Private`) among the features in the model card.
+1. Run `python -m pytest`; **see** `... passed` and no `failed`.
+2. Open the console. Hover a greyed tool chip (e.g. *giskard* if not installed); **see** "Not installed. To enable: pip install giskard". Press run anyway; **see** the run complete without it.
+3. `python -m ethikit list tools`; **see** the same install hints in the terminal.
+4. Run any model, open its model card and scroll to **Tools that did not run**; **see** each missing tool with its install command.
+5. With network: `python -m ethikit run --data adult`; **see** `workclass=...`-style features in the model card's Quantitative Analysis, and a fairness gap on `sex`.
+6. Run the same command twice with `--seed 5`; **see** byte-identical numbers in `results.json` (compare with `diff`), including `adversarial_perturbation_size`.
 
 ## M2 -- Reference suites per domain
 

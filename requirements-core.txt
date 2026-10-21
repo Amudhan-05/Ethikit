@@ -1,0 +1,6 @@
+# Minimal install: enough to run `python -m ethikit serve` and every tool that only needs
+# scikit-learn. Tools whose library is missing are skipped (and say how to enable them).
+# Python 3.12 is the project standard.
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3

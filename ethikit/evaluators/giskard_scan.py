@@ -111,6 +111,7 @@ class GiskardEvaluator(Evaluator):
         "per principle bucket. Deliberately skips the data-leakage detector -- "
         "see this module's docstring."
     )
+    install_hint = "pip install giskard"
     formula = (
         "giskard.scan(model, sample, only=[performance, robustness]) → issues\n"
         "weight(issue) = 3 (major) | 2 (medium) | 1 (minor)\n"

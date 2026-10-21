@@ -68,8 +68,8 @@ ethikit runs entirely on your machine: no accounts, no hosting, nothing leaves y
 git clone https://github.com/Amudhan-05/ethikit && cd ethikit
 python3.12 -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt                            # everything, incl. optional tools
-# minimal alternative: pip install -e .                    # scikit-learn only; tools needing
-#                                                          # missing libraries are skipped
+# minimal alternative: pip install -r requirements-core.txt # scikit-learn only; tools needing
+#                                                          # missing libraries are skipped (and say how to enable them)
 ```
 
 **2. Start the console** and leave it running
@@ -97,6 +97,16 @@ disposable. Everything is also pip-installable: `pip install -e .` adds an `ethi
 `run_phase2_demo` (cross-validation + significance; the meta-benchmark part needs
 `pip install pmlb`), `run_phase3_demo` (membership inference, adversarial attack, drift),
 `streamlit run demo/app.py` (older Streamlit UI).
+
+**4. Check it works**
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -m "not e2e"     # ~7 s
+python -m pytest -m e2e           # drives the console in headless Chromium (playwright install chromium first)
+```
+
+[TESTING.md](TESTING.md) lists what every test guarantees and a visual checklist to verify by eye.
 
 **Troubleshooting**
 - *A tool shows "not installed" in the console:* `pip install` its package (see `requirements.txt`); the rest still run.
