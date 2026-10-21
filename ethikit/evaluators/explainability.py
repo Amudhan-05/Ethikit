@@ -17,7 +17,7 @@ import numpy as np
 
 from ..core.types import EvalContext, EvalResult, TaskType
 from ..principles import InspectionTarget
-from .base import Evaluator, register
+from .base import Evaluator, make_trace, register
 
 
 def _has_shap():
@@ -42,11 +42,17 @@ class ExplainabilityEvaluator(Evaluator):
         "background sample; falls back to the surrogate tree's own "
         "feature_importances_ if SHAP errors or isn't installed."
     )
+    formula = (
+        "surrogate T = DecisionTree(max_depth=3) fit on (X_test, f(X_test))\n"
+        "surrogate_fidelity = mean_i 1[T(x_i) = f(x_i)]       (regression: max(0, R²(f(x), T(x))))\n"
+        "SHAP: φ_j(x) = Σ_{S ⊆ F∖{j}} |S|!(|F|−|S|−1)!/|F|! · [f(S ∪ {j}) − f(S)]\n"
+        "attribution_j = mean_i |φ_j(x_i)|     (permutation-sampled approximation)"
+    )
 
     def evaluate(self, ctx: EvalContext) -> List[EvalResult]:
         X_test = ctx.dataset.X_test
         y_pred = np.asarray(ctx.y_pred)
-        fidelity, top = self._surrogate_fidelity(ctx, X_test, y_pred)
+        fidelity, top, rules, agree = self._surrogate_fidelity(ctx, X_test, y_pred)
         backend = "permutation_importance"
         shap_meta = None
 
@@ -75,7 +81,16 @@ class ExplainabilityEvaluator(Evaluator):
                 f"by the tree's own feature_importances_."
             )
 
-        details = {"top_features": top, "attribution_backend": backend}
+        trace = make_trace(
+            steps=[f"surrogate_fidelity = rows where tree agrees with model / n = "
+                   f"{agree} / {len(y_pred)} = {fidelity:.4f}"],
+            charts=[{"title": f"Top feature attributions ({backend})", "type": "bars",
+                     "labels": [f for f, _ in top],
+                     "series": [{"name": "importance", "values": [v for _, v in top]}]}],
+            text=[{"title": "The depth-3 surrogate tree a human would read (sklearn export_text)",
+                   "body": rules}],
+        )
+        details = {"top_features": top, "attribution_backend": backend, "trace": trace}
         return [
             EvalResult(self.name, "explainability", InspectionTarget.MODEL_INTERNALS,
                        "surrogate_fidelity", fidelity, True, mechanism, details),
@@ -125,16 +140,20 @@ class ExplainabilityEvaluator(Evaluator):
             surrogate = DecisionTreeClassifier(max_depth=3, random_state=0)
             surrogate.fit(Xt, y_pred)
             fidelity = float(accuracy_score(y_pred, surrogate.predict(Xt)))
+            agree = int(np.sum(surrogate.predict(Xt) == y_pred))
         else:
             surrogate = DecisionTreeRegressor(max_depth=3, random_state=0)
             surrogate.fit(Xt, y_pred)
             fidelity = float(max(0.0, r2_score(y_pred, surrogate.predict(Xt))))
+            agree = int(np.sum(np.isclose(surrogate.predict(Xt), y_pred)))
 
         names = ctx.dataset.feature_names or [f"f{i}" for i in range(Xt.shape[1])]
         imp = surrogate.feature_importances_
         order = np.argsort(imp)[::-1][:5]
         top = [(names[i], round(float(imp[i]), 3)) for i in order if imp[i] > 0]
-        return fidelity, top
+        from sklearn.tree import export_text
+        rules = export_text(surrogate, feature_names=[str(n) for n in names], decimals=3)
+        return fidelity, top, rules, agree
 
 
 register(ExplainabilityEvaluator())

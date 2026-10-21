@@ -1,37 +1,223 @@
 <!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit report - adult_income</title>
-<style>
-
+<style>/* ethikit theme -- one palette for the docs site, the console, reports and model cards.
+ *
+ * Colours come from the project proposal: ink #17211d, green #2f6f57, clay #c1663b,
+ * amber #e3a54a, blue #3d6a8f, purple #6b4d86. Light mode is the proposal as written;
+ * dark mode keeps the same hues on an ink-green surface, with lifted text tints.
+ *
+ * Mode: follows the OS (prefers-color-scheme) unless the viewer picks one with the
+ * ☀/☾ toggle (theme.js), which sets <html data-theme="light|dark"> and remembers it.
+ *
+ * Canonical copy: ethikit/web/theme.css. docs/theme.css is a copy written by
+ * `python -m ethikit export-site`; generated reports inline this file.
+ */
 :root{
-  color-scheme:dark;
+  color-scheme: light;
+  --bg:#f6f4ee; --bg-raised:#ffffff; --bg-sunken:#eeebe2;
+  --ink:#17211d; --ink-dim:#55635c; --ink-faint:#86928b;
+  --rule:#e2ded3; --rule-strong:#cdc8b9;
+
+  --green:#2f6f57;
+  --accent:#2f6f57; --accent-ink:#ffffff; --accent-soft:#e4efe9; --accent-rule:#a9cbbb;
+  --amber:#e3a54a;
+  --gold:#93661c; --gold-soft:#fbf1df; --gold-rule:#e3c48a;
+  --clay:#c1663b;
+  --red:#b0572f; --red-soft:#f8e6dc; --red-rule:#e2b49b;
+  --blue-solid:#3d6a8f;
+  --blue:#3d6a8f; --blue-soft:#e8eff5; --blue-rule:#b3c8da;
+  --purple-solid:#6b4d86;
+  --purple:#6b4d86; --purple-soft:#efe7f3; --purple-rule:#cdb9dc;
+
+  --mono-surface:#eeebe2; --mono-ink:#2c3a33;
+  --shadow:0 1px 0 rgba(23,33,29,.06);
+
+  --font-display:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+  --font-body:"Public Sans",-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0e1511; --bg-raised:#17211d; --bg-sunken:#0a100d;
+    --ink:#e6eee9; --ink-dim:#a2b3aa; --ink-faint:#72857b;
+    --rule:#25352d; --rule-strong:#35493f;
+    --accent:#5fb893; --accent-ink:#07130e; --accent-soft:#17291f; --accent-rule:#2f6f57;
+    --gold:#e3a54a; --gold-soft:#2a2113; --gold-rule:#6e5224;
+    --red:#e08a62; --red-soft:#2d1b14; --red-rule:#7a4128;
+    --blue:#82b4da; --blue-soft:#14222e; --blue-rule:#3d6a8f;
+    --purple:#b8a0d6; --purple-soft:#221a2d; --purple-rule:#6b4d86;
+    --mono-surface:#121b17; --mono-ink:#c3d4ca;
+    --shadow:0 1px 0 rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
   --bg:#0e1511; --bg-raised:#17211d; --bg-sunken:#0a100d;
   --ink:#e6eee9; --ink-dim:#a2b3aa; --ink-faint:#72857b;
   --rule:#25352d; --rule-strong:#35493f;
-  --accent:#5fb893; --accent-soft:#17291f; --accent-rule:#2f6f57;
+  --accent:#5fb893; --accent-ink:#07130e; --accent-soft:#17291f; --accent-rule:#2f6f57;
   --gold:#e3a54a; --gold-soft:#2a2113; --gold-rule:#6e5224;
   --red:#e08a62; --red-soft:#2d1b14; --red-rule:#7a4128;
   --blue:#82b4da; --blue-soft:#14222e; --blue-rule:#3d6a8f;
   --purple:#b8a0d6; --purple-soft:#221a2d; --purple-rule:#6b4d86;
   --mono-surface:#121b17; --mono-ink:#c3d4ca;
+  --shadow:0 1px 0 rgba(0,0,0,.35);
 }
 
+/* ---- terminal title bar + theme toggle (injected by theme.js) ---------------- */
+.ek-bar{
+  position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:14px;
+  padding:0 16px; height:40px; background:var(--bg-sunken); border-bottom:1px solid var(--rule);
+  font-family:var(--font-mono); font-size:12.5px; color:var(--ink-dim);
+}
+.ek-dots{display:flex; gap:6px; flex:none}
+.ek-dots i{width:10px; height:10px; border-radius:50%; display:block; background:var(--rule-strong)}
+.ek-dots i:nth-child(1){background:var(--clay)} .ek-dots i:nth-child(2){background:var(--amber)}
+.ek-dots i:nth-child(3){background:var(--green)}
+.ek-path{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
+.ek-path b{color:var(--accent); font-weight:600}
+.ek-nav{display:flex; gap:2px; margin-left:auto; overflow-x:auto; scrollbar-width:none}
+.ek-nav::-webkit-scrollbar{display:none}
+.ek-nav a{color:var(--ink-dim); text-decoration:none; padding:4px 8px; border-radius:4px; white-space:nowrap}
+.ek-nav a:hover{color:var(--ink); background:var(--bg-raised)}
+.ek-nav a[aria-current="page"]{color:var(--accent)}
+.ek-nav a::before{content:"./"; color:var(--ink-faint)}
+.ek-theme{
+  display:inline-flex; flex:none; border:1px solid var(--rule-strong); border-radius:6px; overflow:hidden;
+  background:var(--bg-raised);
+}
+.ek-theme button{
+  all:unset; cursor:pointer; width:28px; height:24px; display:grid; place-items:center;
+  color:var(--ink-faint); font-size:14px; line-height:1;
+}
+.ek-theme button:hover{color:var(--ink)}
+.ek-theme button[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent)}
+.ek-theme button:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+@media (max-width:640px){ .ek-path{display:none} .ek-nav{margin-left:0} }
+</style>
+<script data-path="docs/sample-report" data-nav="docs">/* ethikit theme switcher + terminal title bar.
+ *
+ * Load in <head> (not deferred) so a remembered choice applies before first paint:
+ *   <script src="theme.js" data-path="docs/proposal" data-nav="docs"><\/script>
+ * - No choice stored -> follows the OS light/dark setting.
+ * - ☀ / ☾ buttons pin light / dark; pressing the pinned one again returns to "auto".
+ * - The choice is shared by every ethikit page on the same origin (localStorage) and
+ *   syncs live across open tabs and into embedded model cards.
+ * data-nav="docs" adds the docs links; data-nav="docs" shows only the toggle.
+ *
+ * Canonical copy: ethikit/web/theme.js (docs/theme.js is copied by export-site).
+ */
+(function () {
+  var KEY = "ethikit-theme";
+  var root = document.documentElement;
+  var script = document.currentScript;
+
+  function stored() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function save(v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} }
+  function apply(v) {
+    if (v === "light" || v === "dark") root.setAttribute("data-theme", v);
+    else root.removeAttribute("data-theme");
+    var btns = document.querySelectorAll(".ek-theme button");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].setAttribute("aria-pressed", String(btns[i].dataset.mode === v));
+    }
+    root.dispatchEvent(new CustomEvent("ethikit-theme", { detail: v || "auto" }));
+  }
+  apply(stored());
+
+  window.addEventListener("storage", function (e) { if (e.key === KEY) apply(e.newValue); });
+
+  function toggle() {
+    var el = document.createElement("span");
+    el.className = "ek-theme";
+    el.setAttribute("role", "group");
+    el.setAttribute("aria-label", "Colour theme");
+    [["light", "☀", "Light theme"], ["dark", "☾", "Dark theme"]].forEach(function (m) {
+      var b = document.createElement("button");
+      b.type = "button"; b.dataset.mode = m[0]; b.textContent = m[1];
+      b.title = m[2] + " (press again to follow your system setting)";
+      b.setAttribute("aria-label", m[2]);
+      b.setAttribute("aria-pressed", String(stored() === m[0]));
+      b.addEventListener("click", function () {
+        var next = stored() === m[0] ? null : m[0];
+        save(next); apply(next);
+      });
+      el.appendChild(b);
+    });
+    return el;
+  }
+  window.ethikitThemeToggle = toggle;
+
+  var DOCS = [
+    ["index.html", "home"], ["proposal.html", "proposal"], ["understanding.html", "internals"],
+    ["field-guide.html", "field-guide"], ["report.html", "sample-report"], ["console/", "console"],
+  ];
+
+  function bar() {
+    if (!script || script.dataset.bar === "none" || document.querySelector(".ek-bar")) return;
+    if (window.self !== window.top) return;  // embedded (e.g. a model card in the console): host has the bar
+    var path = script.dataset.path || location.pathname.replace(/^\//, "");
+    var nav = script.dataset.nav || "docs";
+    var base = script.dataset.base || "";
+    if (nav === "console") {
+      // the console is served both from the docs site (docs/console/) and locally by
+      // `ethikit serve`, where the docs aren't -- link to the published docs then.
+      nav = "docs";
+      var onSite = /github\.io$/.test(location.hostname) || location.protocol === "file:";
+      base = onSite ? "../" : "https://amudhan-05.github.io/Ethikit/";
+    }
+    var b = document.createElement("header");
+    b.className = "ek-bar";
+    var dots = '<span class="ek-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+    b.innerHTML = dots + '<span class="ek-path">~/<b>ethikit</b>/' + path + " $</span>";
+    var n = document.createElement("nav");
+    n.className = "ek-nav";
+    n.setAttribute("aria-label", "ethikit pages");
+    if (nav === "docs") {
+      var here = location.pathname.split("/").pop() || "index.html";
+      DOCS.forEach(function (d) {
+        var a = document.createElement("a");
+        a.href = base + d[0]; a.textContent = d[1];
+        if (d[0] === here || (d[0] === "console/" && /\/console\/?/.test(location.pathname))) {
+          a.setAttribute("aria-current", "page");
+        }
+        n.appendChild(a);
+      });
+    }
+    b.appendChild(n);
+    b.appendChild(toggle());
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bar);
+  else bar();
+})();
+</script>
+<style>
+
 *{box-sizing:border-box}
-body{font-family:"Public Sans",-apple-system,"Segoe UI",Roboto,sans-serif;margin:40px;
-  color:var(--ink);background:var(--bg);line-height:1.55}
+body{font-family:var(--font-body);margin:0;color:var(--ink);background:var(--bg);line-height:1.55}
+.page{padding:28px 40px 48px}
+h1{font-family:var(--font-mono);font-weight:600;letter-spacing:-.01em}
+h1::before{content:"$ ";color:var(--accent)}
 b,strong{color:var(--ink)}
-.sub{color:var(--ink-dim);margin-bottom:28px}
+.sub{color:var(--ink-dim);margin-bottom:28px;font-family:var(--font-mono);font-size:13px}
 h2{text-transform:uppercase;letter-spacing:.08em;color:var(--accent);
-  font-family:"IBM Plex Mono",Consolas,monospace;font-weight:600}
-th{color:var(--ink-dim)}
+  font-family:var(--font-mono);font-weight:600}
+h2::before{content:"## ";color:var(--ink-faint)}
+th{color:var(--ink-dim);font-family:var(--font-mono);font-size:.92em}
 tr:hover td,tr:hover th{background:var(--bg-raised)}
 .muted{font-size:13px;color:var(--ink-dim)}
 .pill{display:inline-block;background:var(--accent-soft);color:var(--accent);
-  border:1px solid var(--accent-rule);border-radius:20px}
+  border:1px solid var(--accent-rule);border-radius:20px;font-family:var(--font-mono)}
 .pill.gov{background:var(--gold-soft);color:var(--gold);border-color:var(--gold-rule)}
 .pill.other{background:var(--blue-soft);color:var(--blue);border-color:var(--blue-rule)}
+.pill.bad{background:var(--red-soft);color:var(--red);border-color:var(--red-rule)}
 .note{background:var(--gold-soft);border-left:3px solid var(--gold);color:var(--ink-dim)}
-code{background:var(--mono-surface);color:var(--mono-ink);border-radius:4px;
-  font-family:"IBM Plex Mono",Consolas,monospace}
+code,pre{background:var(--mono-surface);color:var(--mono-ink);border-radius:4px;
+  font-family:var(--font-mono)}
+pre{padding:10px 12px;overflow-x:auto;font-size:12px;line-height:1.5;white-space:pre}
 
 h1{font-size:26px;margin:0 0 4px}
 h2{font-size:16px;margin-top:34px}
@@ -42,7 +228,7 @@ h2{font-size:16px;margin-top:34px}
 .note{padding:12px 16px;font-size:13px;margin-top:24px}
 .tbl.cov th,.tbl.cov td{text-align:left}
 .tbl.cov td:last-child{max-width:520px;white-space:normal;color:var(--ink-dim);font-size:13px}
-</style></head><body>
+</style></head><body><main class="page">
 <h1>Ethical AI evaluation report</h1>
 <div class="sub">Dataset: <b>adult_income</b> &middot; generated by ethikit</div>
 
@@ -226,4 +412,4 @@ Per-model results carry their own run-specific mechanism text -- see each Model 
 </table>
 
 <div class="note">Scores are relative within this run. Ethics is multi-dimensional and context-dependent: use this as evidence for human judgement, not a verdict. Governance principles (accountability, human oversight, well-being) are not captured by these metrics.</div>
-</body></html>
+</main></body></html>

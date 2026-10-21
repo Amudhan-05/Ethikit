@@ -33,7 +33,7 @@ from sklearn import metrics as skm
 
 from ..core.types import EvalContext, EvalResult, TaskType
 from ..principles import InspectionTarget
-from .base import Evaluator, register
+from .base import Evaluator, make_trace, register
 
 
 def _has_alibi_detect() -> bool:
@@ -59,6 +59,13 @@ class DriftEvaluator(Evaluator):
         "the shifted set as drifted AND correctly leave the unshifted set "
         "alone?) and separately measures how much the model's own held-out "
         "performance metric degrades once that shift is present."
+    )
+    formula = (
+        "x_shift = x_test + s ⊙ shift_scale · std_train,   s_j ∈ {−1, +1}\n"
+        "per feature j: KS statistic D_j = sup_t |F_ref,j(t) − F_test,j(t)|  → p_j\n"
+        "is_drift = min_j p_j < p_val / d          (Bonferroni over d features)\n"
+        "drift_detection_score = (1[is_drift(shifted)] + 1[¬is_drift(original)]) / 2\n"
+        "performance_retention = clip(1 − (perf_orig − perf_shift)/|perf_orig|, 0, 1)"
     )
 
     def __init__(self, shift_scale: float = 1.0, p_val: float = 0.05, seed: int = 0):
@@ -107,6 +114,23 @@ class DriftEvaluator(Evaluator):
         drop = max(0.0, float(perf_orig) - float(perf_shift))
         retention = float(np.clip(1.0 - drop / (abs(perf_orig) + 1e-9), 0.0, 1.0))
 
+        names = ds.feature_names or [f"f{i}" for i in range(Xtr.shape[1])]
+        p_orig = np.atleast_1d(np.asarray(res_orig["data"]["p_val"], dtype=float))
+        p_shift = np.atleast_1d(np.asarray(res_shift["data"]["p_val"], dtype=float))
+        threshold = self.p_val / max(1, Xtr.shape[1])
+        trace = make_trace(
+            steps=[f"Bonferroni threshold = {self.p_val} / {Xtr.shape[1]} = {threshold:.5f}",
+                   f"is_drift(shifted) = {drift_shift}, is_drift(original) = {drift_orig} "
+                   f"→ detection_score = {detection_score:.2f}",
+                   f"retention = 1 − ({float(perf_orig):.4f} − {float(perf_shift):.4f}) / "
+                   f"{abs(float(perf_orig)):.4f} = {retention:.4f}"],
+            tables=[{"title": "Per-feature Kolmogorov–Smirnov p-values (reference = train)",
+                     "columns": ["feature", "p (original test)", "p (shifted test)",
+                                 "flagged after shift"],
+                     "rows": [[str(nm), round(float(a), 5), round(float(b), 5),
+                               bool(b < threshold)]
+                              for nm, a, b in zip(names, p_orig, p_shift)]}],
+        )
         mechanism = (
             f"Shift = {self.shift_scale} x per-feature training std, random sign per feature "
             f"(seed={self.seed}). TabularDrift(x_ref=train, p_val={self.p_val}, "
@@ -120,7 +144,7 @@ class DriftEvaluator(Evaluator):
             "shift_scale": self.shift_scale, "p_val": self.p_val,
             "drift_detected_on_shifted": drift_shift, "drift_detected_on_original": drift_orig,
             "metric": metric_name, "perf_original": round(float(perf_orig), 4),
-            "perf_shifted": round(float(perf_shift), 4),
+            "perf_shifted": round(float(perf_shift), 4), "trace": trace,
         }
         return [
             EvalResult(self.name, "safety", InspectionTarget.DATA,

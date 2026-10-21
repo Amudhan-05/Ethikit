@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ethikit Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<script src="theme.js" data-path="console" data-nav="console"></script>
+<link rel="stylesheet" href="console.css">
+</head>
+<body>
+<main class="wrap">
+
+  <div class="banner" id="replay-banner" hidden>
+    <b>recorded run</b> — this page is a replay of a real <code>ethikit run</code>, so it works on the static docs site.
+    Everything after the run (re-weighting, inspect, model cards, governance) is live. To evaluate your own data and
+    models, run <code>pip install -e . &amp;&amp; python -m ethikit serve</code> and open the console locally.
+  </div>
+
+  <!-- 01 configure ---------------------------------------------------------- -->
+  <section class="term" aria-labelledby="h-cfg">
+    <div class="term-h"><span class="no">01</span><span class="title" id="h-cfg">configure</span>
+      <span class="hint">every control below is a flag — the command at the bottom updates as you click</span></div>
+    <div class="term-b">
+      <div class="cmd">
+        <div class="line first"><span class="flag">ethikit run</span><span class="val dim">evaluate candidate models against the ethics battery</span></div>
+        <div class="line"><span class="flag">--data</span>
+          <div class="val">
+            <select id="data-source" aria-label="dataset"></select>
+            <span id="data-desc" class="dim small"></span>
+          </div>
+        </div>
+        <div class="line" id="row-upload" hidden><span class="flag">your csv</span>
+          <div class="val">
+            <input type="file" id="csv-file" accept=".csv,text/csv" aria-label="CSV file">
+            <span id="csv-info" class="dim small"></span>
+          </div>
+        </div>
+        <div class="line" id="row-columns" hidden><span class="flag">--target</span>
+          <div class="val">
+            <select id="target" aria-label="target column"></select>
+            <span class="flag" style="color:var(--gold)">--sensitive</span>
+            <select id="sensitive" aria-label="sensitive column"></select>
+            <label class="inl"><input type="checkbox" id="exclude-sensitive"> --exclude-sensitive</label>
+            <span class="kv"><span>--positive-label</span><input type="text" id="positive-label" size="8" placeholder="auto"></span>
+            <span class="kv"><span>--sensitive-threshold</span><input type="number" id="sensitive-threshold" placeholder="median" step="any"></span>
+          </div>
+        </div>
+        <div class="line" id="row-synth" hidden><span class="flag">--synthetic</span>
+          <div class="val" id="synth-knobs"></div>
+        </div>
+        <div class="line"><span class="flag">--models</span>
+          <div class="val"><div id="models" style="display:grid;gap:4px;width:100%"></div></div>
+        </div>
+        <div class="line"><span class="flag">--estimator</span>
+          <div class="val">
+            <input type="text" id="est-name" placeholder="name" size="10" aria-label="estimator name">
+            <span class="dim">=</span>
+            <input type="text" id="est-path" placeholder="sklearn.ensemble.ExtraTreesClassifier" size="38" aria-label="estimator import path">
+            <button class="btn" id="est-add" type="button">add</button>
+            <span id="est-list" class="chips"></span>
+          </div>
+        </div>
+        <div class="line" id="row-modelfile"><span class="flag">--model-file</span>
+          <div class="val">
+            <input type="file" id="model-file" accept=".joblib,.pkl,.pickle" aria-label="pre-trained model file">
+            <span id="model-file-info" class="dim small">optional: your own pre-trained sklearn-compatible model, evaluated as-is (only load files you trust)</span>
+          </div>
+        </div>
+        <div class="line"><span class="flag">--tools</span>
+          <div class="val"><div id="tools" class="chips"></div></div>
+        </div>
+        <div class="line"><span class="flag">--weights</span>
+          <div class="val" id="weights"></div>
+        </div>
+        <div class="line"><span class="flag">--seed</span>
+          <div class="val">
+            <input type="number" id="seed" value="0" step="1" aria-label="seed">
+            <span class="kv"><span>--test-size</span><input type="number" id="test-size" value="0.3" step="0.05" min="0.1" max="0.6"></span>
+            <label class="inl"><input type="checkbox" id="no-scale"> --no-scale</label>
+          </div>
+        </div>
+      </div>
+
+      <details class="adv" id="advanced">
+        <summary>advanced — every hyperparameter of every selected model, and every tool parameter (<span id="adv-count">0</span> changed)</summary>
+        <p class="dim small">Values are Python literals (<code>200</code>, <code>0.1</code>, <code>None</code>, <code>'balanced'</code>, <code>(64, 32)</code>). Changed values become <code>--model-param</code> / <code>--tool-param</code> flags.</p>
+        <div class="adv-grid" id="adv-models"></div>
+        <div class="adv-grid" id="adv-tools"></div>
+      </details>
+
+      <div class="cmdline">
+        <code id="cmd-preview"></code>
+        <button class="btn" id="copy" type="button">copy</button>
+        <button class="btn primary" id="run" type="button">⏎ run</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 execution ------------------------------------------------------------ -->
+  <section class="term" aria-labelledby="h-exec">
+    <div class="term-h"><span class="no">02</span><span class="title" id="h-exec">execution graph</span>
+      <span class="hint">data &amp; models → tools grouped by principle → results per principle, live</span>
+      <span class="right"><span id="prog-text" class="dim small">idle</span><span class="progress"><i id="prog"></i></span></span></div>
+    <div class="exec">
+      <div class="gwrap"><svg id="graph" role="img" aria-label="Live execution graph"></svg></div>
+      <div class="logwrap"><pre class="log" id="log" aria-live="polite"><span class="t">ready.</span> configure a run above and press ⏎ run</pre></div>
+    </div>
+  </section>
+
+  <!-- 03 output ---------------------------------------------------------------- -->
+  <section class="term" aria-label="results">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="results">results</button>
+      <button role="tab" aria-selected="false" data-tab="inspect">inspect</button>
+      <button role="tab" aria-selected="false" data-tab="card">model-card</button>
+      <button role="tab" aria-selected="false" data-tab="gov">governance</button>
+      <span class="right" id="run-label"></span>
+    </div>
+    <div class="panel" id="tab-results" role="tabpanel"><div class="empty">no run yet</div></div>
+    <div class="panel" id="tab-inspect" role="tabpanel" hidden><div class="empty">no run yet</div></div>
+    <div class="panel" id="tab-card" role="tabpanel" hidden><div class="empty">no run yet</div></div>
+    <div class="panel" id="tab-gov" role="tabpanel" hidden></div>
+  </section>
+</main>
+<script src="console.js"></script>
+</body>
+</html>

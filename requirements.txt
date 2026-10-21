@@ -11,13 +11,15 @@ fairlearn>=0.10        # fairness metrics + mitigation
 shap>=0.44             # explainability (feature attributions)
 giskard>=2.0           # unified ML+LLM scan: subgroup performance bias, robustness,
                        # spurious correlation (data-leakage scan not wired in yet)
-# aif360>=0.6          # 70+ fairness metrics + bias mitigation (needs Python 3.11;
-                       # fails to build here on 3.12 -- confirmed by hand)
+aif360>=0.6.1          # 70+ fairness metrics (IBM, Apache-2.0); 0.6.1 installs on
+                       # Python 3.11-3.13 -- the old 0.5.x build failure no longer applies
 # model-card-toolkit   # real Model Cards backend; its absl-py pin also fails to
                        # build on Python 3.12 here -- ethikit ships an equivalent
                        # hand-rolled renderer in ethikit/report/model_card.py instead
 adversarial-robustness-toolbox>=1.17   # real black-box adversarial attacks (HopSkipJump)
-alibi-detect>=0.12                     # statistical drift detection (TabularDrift)
+alibi-detect>=0.12                     # statistical drift detection (TabularDrift);
+                                       # its deps (mmh3/creme) don't build on Python 3.13 --
+                                       # use Python 3.11 or 3.12 for the full battery
 
 # Demo UI + reporting
 streamlit>=1.30

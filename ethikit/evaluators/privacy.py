@@ -28,7 +28,7 @@ from sklearn.model_selection import StratifiedKFold, cross_val_predict
 
 from ..core.types import EvalContext, EvalResult, TaskType
 from ..principles import InspectionTarget
-from .base import Evaluator, register
+from .base import Evaluator, make_trace, register
 
 _EPS = 1e-12
 
@@ -87,6 +87,13 @@ class MembershipInferenceEvaluator(Evaluator):
         "membership leakage from this feature); higher means the model's "
         "outputs let an attacker tell training rows apart from held-out rows."
     )
+    formula = (
+        "per row: conf(x, y) = f(x)[y],  loss(x, y) = −log conf(x, y)\n"
+        "members M = n train rows, non-members N = n test rows (balanced)\n"
+        "attack a = LogisticRegression on [conf, loss] → P(member)   (k-fold out-of-fold)\n"
+        "membership_inference_auc = AUC(a(M ∪ N), 1[x ∈ M])\n"
+        "membership_inference_advantage = max(0, 2·(accuracy(a) − 0.5))   (= TPR − FPR at 0.5)"
+    )
 
     def __init__(self, min_group_size: int = 20, max_splits: int = 5, seed: int = 0):
         self.min_group_size = min_group_size
@@ -136,9 +143,25 @@ class MembershipInferenceEvaluator(Evaluator):
             f"out-of-fold attack AUC={attack_auc:.4f}, "
             f"attack accuracy={attack_acc:.4f}, advantage={advantage:.4f}."
         )
+        # The picture the attacker sees: the first attack feature for members vs
+        # non-members. Two overlapping histograms = no leak; separated = leak.
+        f_mem, f_non = X_attack[:n, 0], X_attack[n:, 0]
+        edges = np.histogram_bin_edges(np.concatenate([f_mem, f_non]), bins=15)
+        h_mem, _ = np.histogram(f_mem, bins=edges)
+        h_non, _ = np.histogram(f_non, bins=edges)
+        trace = make_trace(
+            steps=[f"attack accuracy (out-of-fold) = {attack_acc:.4f}",
+                   f"advantage = max(0, 2 × ({attack_acc:.4f} − 0.5)) = {advantage:.4f}",
+                   f"AUC = {attack_auc:.4f}   (0.5 = attacker is guessing)"],
+            charts=[{"title": f"Attack feature '{desc.split(' + ')[0]}': members (train) vs "
+                              f"non-members (test)", "type": "hist",
+                     "labels": [f"{e:.3f}" for e in edges[:-1]],
+                     "series": [{"name": "members", "values": [int(v) for v in h_mem]},
+                                {"name": "non-members", "values": [int(v) for v in h_non]}]}],
+        )
         details = {
             "n_members_used": n, "feature_set": desc, "n_splits": n_splits,
-            "attack_accuracy": round(attack_acc, 4),
+            "attack_accuracy": round(attack_acc, 4), "trace": trace,
         }
         return [
             EvalResult(self.name, "privacy", InspectionTarget.BEHAVIOR,

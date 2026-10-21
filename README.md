@@ -48,8 +48,10 @@ shift. See `examples/run_phase3_demo.py`.
 
 ```bash
 pip install -r requirements.txt        # or: pip install -e ".[full,phase2,phase3]"
+python -m ethikit serve --open         # the console: live flow graph, inspect, model cards, checklists
+python -m ethikit run --trace          # the same run in the terminal (see `ethikit run --help`)
 python -m examples.run_demo            # single-dataset demo; runs offline on synthetic data
-streamlit run demo/app.py              # interactive UI
+streamlit run demo/app.py              # legacy Streamlit UI
 python -m examples.run_phase2_demo     # generalization: CV, significance, meta-benchmark
 python -m examples.run_phase3_demo     # real attacks: membership inference, adversarial, drift
 ```
@@ -57,8 +59,42 @@ python -m examples.run_phase3_demo     # real attacks: membership inference, adv
 The demo works with **zero network** (synthetic biased dataset) and upgrades to the real
 UCI Adult dataset automatically when online. It also works with **just scikit-learn** --
 every evaluator prefers `fairlearn`/`shap`/`giskard` when installed and falls back to a
-dependency-free implementation when they aren't (`aif360` and `model-card-toolkit` are
-two examples that don't currently build on Python 3.12; see `requirements.txt`).
+dependency-free implementation when they aren't. `aif360` 0.6.1 now installs on Python
+3.11-3.13 and runs as its own evaluator (disparate impact / 80% rule, equal opportunity,
+average odds, Theil index). `alibi-detect` doesn't build on 3.13 and `model-card-toolkit`
+doesn't build on 3.12+, so **Python 3.11 or 3.12** gives you the fullest battery (see
+`requirements.txt`).
+
+## The console and the CLI
+
+`python -m ethikit serve` opens a terminal-style web console (standard library only, no extra
+install). Every control is a CLI flag, and the console shows the equivalent `ethikit run …` line
+as you click. Pressing run streams the sweep live through a flow graph: inputs → each tool,
+grouped under the principle it measures → results per principle. After the run you get:
+
+- **results** -- the leaderboard (re-ranks instantly when you change the weights), radar, Pareto front
+- **inspect** -- for any model × tool: the formula, the same formula worked through with this
+  run's numbers, and the intermediate artefacts (per-group tables, the attacker's
+  member/non-member histograms, the surrogate tree's rules, per-feature drift p-values, ...)
+- **model-card** -- the full card, now including all of the above and any governance checklist
+- **governance** -- condensed Deon, EU ALTAI, Datasheets for Datasets and NIST AI RMF checklists
+  for the principles no tool can measure (accountability, human oversight, well-being)
+
+Bring your own data and models:
+
+```bash
+ethikit run --data loans.csv --target approved --sensitive sex      # any CSV
+ethikit run --synthetic n=2000 minority_share=0.15 bias=1.5          # tunable synthetic data
+ethikit run --model-param random_forest.max_depth=5                  # any hyperparameter
+ethikit run --estimator xt=sklearn.ensemble.ExtraTreesClassifier     # any estimator class
+ethikit run --model-file mine=model.joblib --no-scale ...            # your own trained model, as-is
+ethikit run --tool-param robustness.sigma=0.25                       # any tool parameter
+ethikit list params random_forest | ethikit list tools | ethikit checklist altai
+```
+
+The docs site's [console page](https://amudhan-05.github.io/Ethikit/console/) replays a recorded
+real run (GitHub Pages can't run Python); refresh it with `python -m ethikit export-site docs`.
+Everything follows your system light/dark setting, with a ☀/☾ toggle to override it.
 
 ## Docs
 
@@ -67,6 +103,7 @@ two examples that don't currently build on Python 3.12; see `requirements.txt`).
 
 | Page | What it's for |
 |---|---|
+| [Console](https://amudhan-05.github.io/Ethikit/console/) | The console, replaying a recorded run -- the same UI `python -m ethikit serve` gives you locally. |
 | [Project Proposal](https://amudhan-05.github.io/Ethikit/proposal.html) | The original pitch: the problem, the four-body principle taxonomy, and where the project is headed. |
 | [Ethikit Internals](https://amudhan-05.github.io/Ethikit/understanding.html) | The technical companion: every component's mechanism, design rationale, and real-world application angle -- built for learning how and why it's built this way. |
 | [Field Guide](https://amudhan-05.github.io/Ethikit/field-guide.html) | A live-demo script (cue cards, timing, what to say) plus a component reference -- built for presenting ethikit to an audience. |

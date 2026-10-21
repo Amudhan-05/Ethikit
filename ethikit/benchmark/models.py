@@ -6,7 +6,7 @@ gradient-boosted trees into the tree_based family the same way.
 """
 from __future__ import annotations
 
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 
 from sklearn.ensemble import (
     GradientBoostingClassifier, GradientBoostingRegressor,
@@ -79,3 +79,68 @@ def family_of(model_name: str) -> str:
             if model_name in models:
                 return fam
     return "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Power-user hooks: every hyperparameter, any estimator, your own fitted model
+# ---------------------------------------------------------------------------
+def default_params(model_name: str) -> Dict[str, object]:
+    """Every constructor parameter of a zoo model, as sklearn's get_params()
+    reports it (shallow), with the zoo's own overrides already applied."""
+    factory = {**flat_classifiers(), **flat_regressors()}[model_name]
+    return factory().get_params(deep=False)
+
+
+def _coerce(value, default):
+    """CLI/console strings -> the type the estimator expects: Python literals
+    ("200", "0.1", "None", "'balanced'", "(64, 32)") or a bare string ("rbf")."""
+    import ast
+    if not isinstance(value, str):
+        return value
+    try:
+        return ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        return value
+
+
+def with_params(factory: Callable, overrides: Dict[str, object]) -> Callable:
+    """Wrap a factory so the estimator it builds gets `overrides` via set_params
+    (unknown keys fail loudly when the model is built, naming the valid ones)."""
+    if not overrides:
+        return factory
+
+    def build():
+        est = factory()
+        current = est.get_params(deep=False)
+        bad = [k for k in overrides if k not in current]
+        if bad:
+            raise KeyError(f"{type(est).__name__} has no parameter(s) {', '.join(bad)}; "
+                           f"valid: {', '.join(sorted(current))}")
+        est.set_params(**{k: _coerce(v, current[k]) for k, v in overrides.items()})
+        return est
+    return build
+
+
+def estimator_from_path(path: str, params: Optional[Dict[str, object]] = None) -> Callable:
+    """Factory for ANY importable estimator class, e.g.
+    'sklearn.ensemble.ExtraTreesClassifier' or 'xgboost.XGBClassifier' -- so
+    the zoo is a default, not a limit."""
+    import importlib
+    module, _, cls = path.rpartition(".")
+    klass = getattr(importlib.import_module(module), cls)
+    return with_params(klass, params or {})
+
+
+def load_fitted_model(path: str):
+    """Load an already-trained estimator saved with joblib/pickle, to evaluate
+    as-is. Only load files you trust: unpickling runs arbitrary code. The model
+    must accept the same feature columns ethikit builds from your data (see
+    prepare_frame), and -- if you trained it on unscaled features -- run with
+    scaling disabled (`--no-scale`)."""
+    try:
+        import joblib
+        return joblib.load(path)
+    except ImportError:
+        import pickle
+        with open(path, "rb") as fh:
+            return pickle.load(fh)

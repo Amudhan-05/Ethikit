@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit Docs</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
+<script src="theme.js" data-path="docs"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.6}
@@ -13,7 +14,7 @@ a{color:var(--accent)}
 a:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
 .wrap{max-width:920px; margin:0 auto; padding:64px 28px 56px}
 .eyebrow{font-family:var(--font-mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint)}
-h1{font-family:var(--font-display); font-weight:800; font-size:clamp(44px,8vw,76px); line-height:.98; margin:10px 0 0; text-wrap:balance}
+h1{font-family:var(--font-display); font-weight:700; font-size:clamp(38px,7vw,64px); line-height:1; letter-spacing:-.03em; margin:10px 0 0; text-wrap:balance}
 .lede{font-size:18px; color:var(--ink-dim); max-width:58ch; margin:18px 0 0}
 .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:14px; margin-top:44px}
 .card{
@@ -22,7 +23,9 @@ h1{font-family:var(--font-display); font-weight:800; font-size:clamp(44px,8vw,76
 }
 .card:hover{border-color:var(--accent); }
 .card:hover h2{color:var(--accent)}
-.card h2{font-family:var(--font-display); font-weight:700; font-size:26px; line-height:1.05; margin:0}
+h1::before{content:"$ "; color:var(--accent)}
+.card h2::before{content:"./"; color:var(--ink-faint); font-weight:400}
+.card h2{font-family:var(--font-display); font-weight:600; font-size:21px; line-height:1.05; margin:0}
 .card p{margin:0; color:var(--ink-dim); font-size:14.5px}
 .meta{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:auto; padding-top:8px}
 .tag{font-family:var(--font-mono); font-size:11px; padding:3px 9px; border-radius:20px; background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-rule)}
@@ -41,6 +44,11 @@ footer a{color:var(--ink-dim)}
   <p class="lede">An orchestrator that runs real fairness, explainability, privacy, and robustness checks against your models and shows the trade-offs, instead of pretending there is one "most ethical" score.</p>
 
   <div class="cards">
+    <a class="card" href="console/">
+      <h2>Console</h2>
+      <p>The live, terminal-style UI: pick data, models, tools and weights; watch the run flow through every tool by principle; inspect the maths behind each number; attach a governance checklist to the model cards. Here it replays a recorded run; run <code>python -m ethikit serve</code> to use it on your own data.</p>
+      <div class="meta"><span class="tag">try it</span><span class="file">console/</span></div>
+    </a>
     <a class="card" href="proposal.html">
       <h2>Project Proposal</h2>
       <p>The problem, the shared principle taxonomy (UNESCO, Microsoft, IBM, Google), how the orchestrator works, and where the project is headed.</p>
@@ -63,7 +71,7 @@ footer a{color:var(--ink-dim)}
     </a>
   </div>
 
-  <p class="start">New here? Read the proposal for the idea, then Internals for the detail. Presenting it? Open the Field Guide.</p>
+  <p class="start">New here? Read the proposal for the idea, then Internals for the detail. Presenting it? Open the Field Guide and the Console.</p>
 
   <footer>
     <a href="https://github.com/Amudhan-05/ethikit">Source on GitHub</a>

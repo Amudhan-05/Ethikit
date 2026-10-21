@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit Field Guide</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
+<script src="theme.js" data-path="docs/field-guide"></script>
 <style>
 
 *{box-sizing:border-box}
@@ -31,7 +32,8 @@ header.masthead{
   padding:52px 0 34px; border-bottom:1px solid var(--rule);
 }
 header.masthead .kicker{display:flex; align-items:baseline; gap:10px; margin-bottom:18px}
-header.masthead h1{font-size:clamp(34px,5vw,58px); letter-spacing:0}
+header.masthead h1{font-size:clamp(30px,4.4vw,50px); letter-spacing:-.02em}
+header.masthead h1::before{content:"$ "; color:var(--accent)}
 header.masthead .lede{font-size:18px; color:var(--ink-dim); max-width:62ch; margin-top:14px}
 .statrow{display:flex; flex-wrap:wrap; gap:0; margin-top:30px; border:1px solid var(--rule); border-radius:3px; overflow:hidden}
 .stat{flex:1 1 140px; padding:14px 18px; border-right:1px solid var(--rule); background:var(--bg-raised)}
@@ -41,7 +43,7 @@ header.masthead .lede{font-size:18px; color:var(--ink-dim); max-width:62ch; marg
 
 /* ---------- nav ---------- */
 nav.jump{
-  position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--rule);
+  position:sticky; top:40px; z-index:5; background:var(--bg); border-bottom:1px solid var(--rule);
   padding:10px 0;
 }
 nav.jump .row{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; scrollbar-width:thin}
@@ -56,7 +58,8 @@ main{padding:0 0 90px}
 section.block{padding:56px 0; border-bottom:1px solid var(--rule)}
 section.block:last-of-type{border-bottom:none}
 .section-head{display:flex; align-items:baseline; gap:16px; margin-bottom:28px; flex-wrap:wrap}
-.section-head h2{font-size:clamp(24px,3vw,34px)}
+.section-head h2{font-size:clamp(21px,2.6vw,30px); letter-spacing:-.01em}
+.section-head h2::before{content:"## "; color:var(--ink-faint)}
 .section-head .tag{font-family:var(--font-mono); font-size:11.5px; padding:4px 9px; border-radius:3px; letter-spacing:.04em}
 .tag.green{background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-rule)}
 .tag.gold{background:var(--gold-soft); color:var(--gold); border:1px solid var(--gold-rule)}
@@ -66,7 +69,7 @@ section.block:last-of-type{border-bottom:none}
 /* ---------- demo script cue cards ---------- */
 .cue-list{display:flex; flex-direction:column; gap:0; border-top:1px solid var(--rule)}
 .cue{display:grid; grid-template-columns:64px 1fr; gap:22px; padding:22px 0; border-bottom:1px solid var(--rule)}
-.cue .num{font-family:var(--font-display); font-size:34px; font-weight:800; color:var(--rule-strong); line-height:1}
+.cue .num{font-family:var(--font-display); font-size:34px; font-weight:700; color:var(--rule-strong); line-height:1}
 .cue.live .num{color:var(--accent)}
 .cue-body h3{font-size:19px; margin-bottom:6px}
 .cue-meta{display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap}
@@ -193,7 +196,7 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
       <h2>Demo script</h2>
       <span class="tag green">~8 minutes</span>
     </div>
-    <p class="section-intro">Built for a small live demo with a narrated fallback — every step has something to click <em>and</em> something to say if you'd rather just talk through it. Order matters here, so it's numbered like the run sheet it is. Total run time assumes the Streamlit app and one pre-generated report are already open in tabs before your mentors sit down.</p>
+    <p class="section-intro">Built for a small live demo with a narrated fallback — every step has something to click <em>and</em> something to say if you'd rather just talk through it. Order matters here, so it's numbered like the run sheet it is. Total run time assumes the console (<code>python -m ethikit serve</code>) and one pre-generated report are already open in tabs before your mentors sit down.</p>
 
     <div class="cue-list">
 
@@ -210,20 +213,20 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
       <div class="cue live">
         <div class="num">02</div>
         <div class="cue-body">
-          <h3>Live: run the Streamlit app</h3>
+          <h3>Live: run the console and watch the flow graph</h3>
           <div class="cue-meta"><span class="pill time">3 min</span><span class="pill">usability</span><span class="pill">live</span></div>
-          <p><code>streamlit run demo/app.py</code> — pick 2-3 model families, hit run, and let the leaderboard + Plotly radar populate. Point at the radar chart first: each spoke is a principle, each colored polygon is a model, and a bigger polygon is strictly better on that axis. Then point at the leaderboard table and explain the weighted-score column only exists because <em>you</em> supplied weights — the tool never invents them.</p>
+          <p><code>python -m ethikit serve</code> — tick 3-4 models across families and point out that the command line at the bottom rewrites itself as you click: everything in the UI is a real CLI flag. Press run and narrate the execution graph while it streams: each model is fitted, then every tool lights up under the principle it measures, and results land per principle. When it finishes, change a <code>--weights</code> value and watch the leaderboard re-rank without re-running. Then the radar: each spoke is a principle, each colored polygon is a model, and a bigger polygon is strictly better on that axis. Then point at the leaderboard table and explain the weighted-score column only exists because <em>you</em> supplied weights — the tool never invents them.</p>
           <div class="cue-say"><b>Say</b>"Every one of these numbers is 0 to 1, always oriented so 1 is best — even where the underlying metric is naturally 'lower is better,' like an error rate. That normalization happens once, in one place, so nothing downstream has to remember which direction is good."</div>
-          <div class="fallback"><b>If the app won't start:</b> open the pre-generated <code>ethikit_report.html</code> in a browser tab instead — same leaderboard and Pareto front, just static. Say "this is what the same run looks like exported as a shareable report."</div>
+          <div class="fallback"><b>If the laptop won't cooperate:</b> open the docs site's <a href="console/">console</a> — it replays a recorded real run through the same graph, and the results, inspect and model-card tabs all work. Or open the pre-generated report.</div>
         </div>
       </div>
 
       <div class="cue live">
         <div class="num">03</div>
         <div class="cue-body">
-          <h3>Live: open one Model Card</h3>
+          <h3>Live: inspect the maths, then open one Model Card</h3>
           <div class="cue-meta"><span class="pill time">2 min</span><span class="pill">usability</span><span class="pill">architecture</span></div>
-          <p>Click into any model's card. Scroll straight to <strong>Quantitative Analysis</strong> and point at the <strong>Mechanism</strong> column — this is the single most important thing to show. Every row explains, in one sentence, exactly what computation produced that number: sample sizes, which library ran, which rows were compared. Then scroll to <strong>Tool coverage</strong> and show that a principle like "safety" has three independent tools corroborating it, and each one is one click away from being swapped or added to.</p>
+          <p>First the <code>inspect</code> tab: pick <code>random_forest</code> → <code>membership_inference</code> and show the two histograms — what the attacker sees for training rows vs held-out rows; then <code>aif360</code> to show the 80%-rule ratio worked through with this run's numbers. Then the <code>model-card</code> tab. Scroll straight to <strong>Quantitative Analysis</strong> and point at the <strong>Mechanism</strong> column — this is the single most important thing to show. Every row explains, in one sentence, exactly what computation produced that number: sample sizes, which library ran, which rows were compared. Then scroll to <strong>Tool coverage</strong> and show that a principle like "safety" has three independent tools corroborating it, and each one is one click away from being swapped or added to.</p>
           <div class="cue-say"><b>Say</b>"No score here is a black box. Every single row traces back to a plain-English sentence of what actually happened — and this card also tells you what <em>other</em> registered tools could have scored this same principle, so picking a tool is a visible choice too, not a hidden default."</div>
         </div>
       </div>
@@ -599,7 +602,9 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
     <div class="section-head"><h2>Commands, for the pre-demo checklist</h2></div>
     <div class="cmdlist">
       <div class="cmdrow"><code>pip install -r requirements.txt</code><span>or <code>pip install -e ".[full,phase2,phase3]"</code> — run once, well before the room fills up</span></div>
-      <div class="cmdrow"><code>streamlit run demo/app.py</code><span>the live UI — open this tab first and leave it running</span></div>
+      <div class="cmdrow"><code>python -m ethikit serve --open</code><span>the live console — open this tab first and leave it running</span></div>
+      <div class="cmdrow"><code>python -m ethikit run --models logistic_regression,random_forest --trace</code><span>the same run in the terminal, with every formula worked through</span></div>
+      <div class="cmdrow"><code>python -m ethikit checklist deon --out answers.json</code><span>governance checklist template; fill it, then <code>ethikit run --checklist answers.json</code></span></div>
       <div class="cmdrow"><code>python -m examples.run_demo</code><span>generates <code>ethikit_report.html</code> + all Model Cards — your static fallback, run this beforehand too</span></div>
       <div class="cmdrow"><code>python -m examples.run_phase2_demo</code><span>CV, significance testing, meta-benchmark — the rigor numbers above</span></div>
       <div class="cmdrow"><code>python -m examples.run_phase3_demo</code><span>the three real attacks, printed with their mechanism text inline</span></div>

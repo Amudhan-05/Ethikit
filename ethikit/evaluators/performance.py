@@ -13,7 +13,7 @@ from sklearn import metrics as skm
 
 from ..core.types import EvalContext, EvalResult, TaskType
 from ..principles import InspectionTarget
-from .base import Evaluator, register
+from .base import Evaluator, make_trace, register
 
 
 class PerformanceEvaluator(Evaluator):
@@ -26,6 +26,12 @@ class PerformanceEvaluator(Evaluator):
         "test set. Not an ethics evaluator -- provides the utility axis every "
         "trade-off in the profile is measured against."
     )
+    formula = (
+        "accuracy = (TP + TN) / n\n"
+        "f1 (macro) = mean_c 2·precision_c·recall_c / (precision_c + recall_c)\n"
+        "roc_auc = P(score(x⁺) > score(x⁻))\n"
+        "regression: r2 = 1 − Σ(y−ŷ)² / Σ(y−ȳ)²,  rmse = √mean((y−ŷ)²)"
+    )
 
     def evaluate(self, ctx: EvalContext) -> List[EvalResult]:
         y_true = np.asarray(ctx.dataset.y_test)
@@ -34,29 +40,48 @@ class PerformanceEvaluator(Evaluator):
         out: List[EvalResult] = []
 
         if ctx.dataset.task == TaskType.CLASSIFICATION:
-            out.append(self._r("accuracy", skm.accuracy_score(y_true, y_pred), True, n))
-            out.append(self._r("f1", skm.f1_score(y_true, y_pred, average="macro"), True, n))
+            labels = sorted(np.unique(np.concatenate([y_true, y_pred])), key=str)
+            cm = skm.confusion_matrix(y_true, y_pred, labels=labels)
+            correct = int(np.trace(cm))
+            trace = make_trace(
+                steps=[f"accuracy = correct / n = {correct} / {n} = {correct / n:.4f}"],
+                tables=[{"title": "Confusion matrix (rows = true, columns = predicted)",
+                         "columns": ["true \\ pred"] + [str(l) for l in labels],
+                         "rows": [[str(l)] + [int(v) for v in row]
+                                  for l, row in zip(labels, cm)]}],
+            )
+            out.append(self._r("accuracy", skm.accuracy_score(y_true, y_pred), True, n, trace))
+            out.append(self._r("f1", skm.f1_score(y_true, y_pred, average="macro"), True, n, trace))
             if ctx.y_proba is not None:
                 try:
                     proba = np.asarray(ctx.y_proba)
                     score = proba[:, 1] if proba.ndim == 2 else proba
-                    out.append(self._r("roc_auc", skm.roc_auc_score(y_true, score), True, n))
+                    out.append(self._r("roc_auc", skm.roc_auc_score(y_true, score), True, n, trace))
                 except Exception:
                     pass
         else:
-            out.append(self._r("r2", skm.r2_score(y_true, y_pred), True, n))
+            resid = y_true - y_pred
+            hist, edges = np.histogram(resid, bins=12)
+            trace = make_trace(
+                steps=[f"r2 = 1 − SS_res/SS_tot = 1 − {float(np.sum(resid ** 2)):.3f} / "
+                       f"{float(np.sum((y_true - y_true.mean()) ** 2)):.3f}"],
+                charts=[{"title": "Residual distribution (y − ŷ)", "type": "hist",
+                         "labels": [f"{e:.2f}" for e in edges[:-1]],
+                         "series": [{"name": "rows", "values": [int(h) for h in hist]}]}],
+            )
+            out.append(self._r("r2", skm.r2_score(y_true, y_pred), True, n, trace))
             rmse = float(np.sqrt(skm.mean_squared_error(y_true, y_pred)))
-            out.append(self._r("rmse", rmse, False, n))
-            out.append(self._r("mae", float(skm.mean_absolute_error(y_true, y_pred)), False, n))
+            out.append(self._r("rmse", rmse, False, n, trace))
+            out.append(self._r("mae", float(skm.mean_absolute_error(y_true, y_pred)), False, n, trace))
         return out
 
-    def _r(self, metric: str, value: float, higher: bool, n: int) -> EvalResult:
+    def _r(self, metric: str, value: float, higher: bool, n: int, trace: dict) -> EvalResult:
         return EvalResult(
             evaluator=self.name, principle_id="utility",
             target=InspectionTarget.PREDICTIONS, metric=metric,
             value=float(value), higher_is_better=higher,
             mechanism=f"sklearn.metrics.{metric}(y_test, y_pred) over {n} held-out test rows.",
-            details={"axis": "utility", "n_test": n},
+            details={"axis": "utility", "n_test": n, "trace": trace},
         )
 
 
