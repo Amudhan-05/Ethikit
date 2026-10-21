@@ -30,7 +30,7 @@ import numpy as np
 
 from ..core.types import EvalContext, EvalResult, TaskType
 from ..principles import InspectionTarget
-from .base import Evaluator, register
+from .base import Evaluator, make_trace, register
 
 
 def _has_art() -> bool:
@@ -63,6 +63,13 @@ class ARTRobustnessEvaluator(Evaluator):
         "also more robust). Complements the existing RobustnessEvaluator's "
         "random-noise stability check with a worst-case, adversarially-"
         "searched one."
+    )
+    formula = (
+        "for each correctly-classified x: find x' = argmin ‖x' − x‖₂  s.t.  f(x') ≠ f(x)\n"
+        "   (HopSkipJump: binary search to the decision boundary + gradient estimate\n"
+        "    from label-only queries, within max_iter / max_eval budget)\n"
+        "adversarial_robustness = 1 − (#rows flipped / #rows attacked)\n"
+        "adversarial_perturbation_size = median over flipped rows of ‖x' − x‖₂ / √d"
     )
 
     def __init__(self, sample_size: int = 15, max_iter: int = 10, max_eval: int = 300,
@@ -102,6 +109,7 @@ class ARTRobustnessEvaluator(Evaluator):
         success_rate = 0.0
         median_norm = None
         n_flipped = 0
+        per_row = []
         if n > 0:
             clf = SklearnClassifier(model=ctx.model, clip_values=(lo, hi))
             atk = HopSkipJump(classifier=clf, max_iter=self.max_iter, max_eval=self.max_eval,
@@ -111,6 +119,9 @@ class ARTRobustnessEvaluator(Evaluator):
             flipped = adv_pred != base_pred[sel]
             success_rate = float(np.mean(flipped))
             n_flipped = int(np.sum(flipped))
+            all_norms = np.linalg.norm(adv - Xte[sel], axis=1) / np.sqrt(n_features)
+            per_row = [[int(i), bool(f), round(float(d), 4)]
+                       for i, f, d in zip(sel, flipped, all_norms)]
             if n_flipped > 0:
                 norms = np.linalg.norm(adv[flipped] - Xte[sel][flipped], axis=1) / np.sqrt(n_features)
                 median_norm = float(np.median(norms))
@@ -122,11 +133,22 @@ class ARTRobustnessEvaluator(Evaluator):
             f"{success_rate * 100:.1f}% of attacked rows had their prediction flipped within budget "
             f"-> adversarial_robustness = 1 - success_rate = {robustness:.4f}."
         )
+        trace = make_trace(
+            steps=[f"adversarial_robustness = 1 − {n_flipped}/{n} = {robustness:.4f}"]
+                  + ([f"perturbation_size = median(‖x'−x‖₂/√{n_features}) over flipped rows "
+                      f"= {median_norm:.4f}"] if median_norm is not None else []),
+            tables=[{"title": "Every attacked row (test-set index, did the attack flip it, "
+                              "scaled L2 distance moved)",
+                     "columns": ["row", "flipped", "‖x'−x‖₂/√d"], "rows": per_row}],
+            charts=[{"title": "Distance the attacker had to move each row", "type": "bars",
+                     "labels": [f"#{r[0]}" for r in per_row],
+                     "series": [{"name": "distance", "values": [r[2] for r in per_row]}]}],
+        )
         results = [
             EvalResult(self.name, "safety", InspectionTarget.BEHAVIOR,
                        "adversarial_robustness", robustness, True, mechanism,
                        {"n_attacked": int(n), "success_rate": round(success_rate, 4),
-                        "n_flipped": n_flipped}),
+                        "n_flipped": n_flipped, "trace": trace}),
         ]
         if median_norm is not None:
             pert_mechanism = (
@@ -138,7 +160,7 @@ class ARTRobustnessEvaluator(Evaluator):
             results.append(EvalResult(
                 self.name, "safety", InspectionTarget.BEHAVIOR,
                 "adversarial_perturbation_size", median_norm, True, pert_mechanism,
-                {"n_flipped": n_flipped, "n_attacked": int(n)}))
+                {"n_flipped": n_flipped, "n_attacked": int(n), "trace": trace}))
         return results
 
 

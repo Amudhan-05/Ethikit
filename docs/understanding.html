@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit Internals</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
+<script src="theme.js" data-path="docs/internals"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.62}
@@ -20,7 +21,7 @@ p{margin:0 0 1em; max-width:68ch}
 strong{font-weight:600}
 
 .shell{display:grid; grid-template-columns:250px minmax(0,1fr); gap:0; max-width:1240px; margin:0 auto}
-.rail{position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto; padding:34px 20px 40px 28px; border-right:1px solid var(--rule)}
+.rail{position:sticky; top:40px; align-self:start; height:calc(100vh - 40px); overflow-y:auto; padding:34px 20px 40px 28px; border-right:1px solid var(--rule)}
 .rail::-webkit-scrollbar{width:8px} .rail::-webkit-scrollbar-thumb{background:var(--rule-strong); border-radius:4px}
 .rail .brand{font-family:var(--font-display); font-size:21px; font-weight:800; margin-bottom:2px}
 .rail .brand-sub{font-size:11.5px; color:var(--ink-faint); margin-bottom:22px; display:block}
@@ -32,14 +33,16 @@ strong{font-weight:600}
 
 .content{padding:0 44px 100px; min-width:0}
 .hero{padding:56px 0 30px; border-bottom:1px solid var(--rule); margin-bottom:8px}
-.hero h1{font-size:clamp(30px,4vw,46px)}
+.hero h1{font-size:clamp(28px,3.6vw,42px); letter-spacing:-.02em}
+.hero h1::before{content:"$ "; color:var(--accent)}
 .hero .lede{font-size:17.5px; color:var(--ink-dim); max-width:64ch; margin-top:14px}
 .hero .howto{margin-top:22px; padding:14px 18px; background:var(--bg-raised); border:1px solid var(--rule); border-left:3px solid var(--accent-rule); border-radius:0 5px 5px 0; font-size:14px; color:var(--ink-dim)}
 .hero .howto b{color:var(--ink); font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.06em; display:block; margin-bottom:4px}
 
 .part-divider{padding:44px 0 8px}
 .part-divider .eyebrow{color:var(--accent)}
-.part-divider h2{font-size:clamp(22px,3vw,30px); margin-top:6px}
+.part-divider h2{font-size:clamp(20px,2.6vw,28px); margin-top:6px}
+.part-divider h2::before{content:"## "; color:var(--ink-faint)}
 .part-divider p{color:var(--ink-dim); margin-top:8px}
 
 article.component{padding:38px 0; border-bottom:1px solid var(--rule)}

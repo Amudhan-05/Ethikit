@@ -1,0 +1,95 @@
+/* ethikit theme -- one palette for the docs site, the console, reports and model cards.
+ *
+ * Colours come from the project proposal: ink #17211d, green #2f6f57, clay #c1663b,
+ * amber #e3a54a, blue #3d6a8f, purple #6b4d86. Light mode is the proposal as written;
+ * dark mode keeps the same hues on an ink-green surface, with lifted text tints.
+ *
+ * Mode: follows the OS (prefers-color-scheme) unless the viewer picks one with the
+ * ☀/☾ toggle (theme.js), which sets <html data-theme="light|dark"> and remembers it.
+ *
+ * Canonical copy: ethikit/web/theme.css. docs/theme.css is a copy written by
+ * `python -m ethikit export-site`; generated reports inline this file.
+ */
+:root{
+  color-scheme: light;
+  --bg:#f6f4ee; --bg-raised:#ffffff; --bg-sunken:#eeebe2;
+  --ink:#17211d; --ink-dim:#55635c; --ink-faint:#86928b;
+  --rule:#e2ded3; --rule-strong:#cdc8b9;
+
+  --green:#2f6f57;
+  --accent:#2f6f57; --accent-ink:#ffffff; --accent-soft:#e4efe9; --accent-rule:#a9cbbb;
+  --amber:#e3a54a;
+  --gold:#93661c; --gold-soft:#fbf1df; --gold-rule:#e3c48a;
+  --clay:#c1663b;
+  --red:#b0572f; --red-soft:#f8e6dc; --red-rule:#e2b49b;
+  --blue-solid:#3d6a8f;
+  --blue:#3d6a8f; --blue-soft:#e8eff5; --blue-rule:#b3c8da;
+  --purple-solid:#6b4d86;
+  --purple:#6b4d86; --purple-soft:#efe7f3; --purple-rule:#cdb9dc;
+
+  --mono-surface:#eeebe2; --mono-ink:#2c3a33;
+  --shadow:0 1px 0 rgba(23,33,29,.06);
+
+  --font-display:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+  --font-body:"Public Sans",-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0e1511; --bg-raised:#17211d; --bg-sunken:#0a100d;
+    --ink:#e6eee9; --ink-dim:#a2b3aa; --ink-faint:#72857b;
+    --rule:#25352d; --rule-strong:#35493f;
+    --accent:#5fb893; --accent-ink:#07130e; --accent-soft:#17291f; --accent-rule:#2f6f57;
+    --gold:#e3a54a; --gold-soft:#2a2113; --gold-rule:#6e5224;
+    --red:#e08a62; --red-soft:#2d1b14; --red-rule:#7a4128;
+    --blue:#82b4da; --blue-soft:#14222e; --blue-rule:#3d6a8f;
+    --purple:#b8a0d6; --purple-soft:#221a2d; --purple-rule:#6b4d86;
+    --mono-surface:#121b17; --mono-ink:#c3d4ca;
+    --shadow:0 1px 0 rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0e1511; --bg-raised:#17211d; --bg-sunken:#0a100d;
+  --ink:#e6eee9; --ink-dim:#a2b3aa; --ink-faint:#72857b;
+  --rule:#25352d; --rule-strong:#35493f;
+  --accent:#5fb893; --accent-ink:#07130e; --accent-soft:#17291f; --accent-rule:#2f6f57;
+  --gold:#e3a54a; --gold-soft:#2a2113; --gold-rule:#6e5224;
+  --red:#e08a62; --red-soft:#2d1b14; --red-rule:#7a4128;
+  --blue:#82b4da; --blue-soft:#14222e; --blue-rule:#3d6a8f;
+  --purple:#b8a0d6; --purple-soft:#221a2d; --purple-rule:#6b4d86;
+  --mono-surface:#121b17; --mono-ink:#c3d4ca;
+  --shadow:0 1px 0 rgba(0,0,0,.35);
+}
+
+/* ---- terminal title bar + theme toggle (injected by theme.js) ---------------- */
+.ek-bar{
+  position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:14px;
+  padding:0 16px; height:40px; background:var(--bg-sunken); border-bottom:1px solid var(--rule);
+  font-family:var(--font-mono); font-size:12.5px; color:var(--ink-dim);
+}
+.ek-dots{display:flex; gap:6px; flex:none}
+.ek-dots i{width:10px; height:10px; border-radius:50%; display:block; background:var(--rule-strong)}
+.ek-dots i:nth-child(1){background:var(--clay)} .ek-dots i:nth-child(2){background:var(--amber)}
+.ek-dots i:nth-child(3){background:var(--green)}
+.ek-path{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
+.ek-path b{color:var(--accent); font-weight:600}
+.ek-nav{display:flex; gap:2px; margin-left:auto; overflow-x:auto; scrollbar-width:none}
+.ek-nav::-webkit-scrollbar{display:none}
+.ek-nav a{color:var(--ink-dim); text-decoration:none; padding:4px 8px; border-radius:4px; white-space:nowrap}
+.ek-nav a:hover{color:var(--ink); background:var(--bg-raised)}
+.ek-nav a[aria-current="page"]{color:var(--accent)}
+.ek-nav a::before{content:"./"; color:var(--ink-faint)}
+.ek-theme{
+  display:inline-flex; flex:none; border:1px solid var(--rule-strong); border-radius:6px; overflow:hidden;
+  background:var(--bg-raised);
+}
+.ek-theme button{
+  all:unset; cursor:pointer; width:28px; height:24px; display:grid; place-items:center;
+  color:var(--ink-faint); font-size:14px; line-height:1;
+}
+.ek-theme button:hover{color:var(--ink)}
+.ek-theme button[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent)}
+.ek-theme button:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+@media (max-width:640px){ .ek-path{display:none} .ek-nav{margin-left:0} }

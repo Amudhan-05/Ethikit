@@ -37,7 +37,7 @@ import pandas as pd
 
 from ..core.types import EvalContext, EvalResult, TaskType
 from ..principles import InspectionTarget
-from .base import Evaluator, register
+from .base import Evaluator, make_trace, register
 
 _LEVEL_WEIGHT = {"major": 3, "medium": 2, "minor": 1}
 
@@ -111,6 +111,11 @@ class GiskardEvaluator(Evaluator):
         "per principle bucket. Deliberately skips the data-leakage detector -- "
         "see this module's docstring."
     )
+    formula = (
+        "giskard.scan(model, sample, only=[performance, robustness]) → issues\n"
+        "weight(issue) = 3 (major) | 2 (medium) | 1 (minor)\n"
+        "giskard_issue_score(principle) = Σ weight(issue) over issues mapped to that principle"
+    )
 
     def __init__(self, sample_size: int = 300, seed: int = 0):
         self.sample_size = sample_size
@@ -180,7 +185,13 @@ class GiskardEvaluator(Evaluator):
             results.append(EvalResult(
                 self.name, principle, InspectionTarget.BEHAVIOR, "giskard_issue_score",
                 float(data["weight"]), False, mechanism,
-                {"n_issues": n_issues, "issues": data["issues"][:5], "sample_size": n},
+                {"n_issues": n_issues, "issues": data["issues"][:5], "sample_size": n,
+                 "trace": make_trace(
+                     steps=[f"score({principle}) = Σ severity weights = {data['weight']:.1f}"],
+                     tables=[{"title": f"Issues Giskard raised that map to '{principle}'",
+                              "columns": ["level", "detector", "description"],
+                              "rows": [[i["level"], i["detector"], i["description"]]
+                                       for i in data["issues"]]}])},
             ))
         return results
 

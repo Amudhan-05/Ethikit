@@ -1,11 +1,19 @@
-# Dark theme for the demo UI -- palette from the project proposal (docs/theme.css).
-[theme]
-base = "dark"
+# Legacy Streamlit demo (the primary UI is now `python -m ethikit serve`).
+# Follows the viewer's system light/dark setting; switch via ⋮ → Settings → Theme.
+# Palette from the project proposal (ethikit/web/theme.css).
+[theme.light]
+primaryColor = "#2f6f57"
+backgroundColor = "#f6f4ee"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#17211d"
+font = "monospace"
+
+[theme.dark]
 primaryColor = "#5fb893"
 backgroundColor = "#0e1511"
 secondaryBackgroundColor = "#17211d"
 textColor = "#e6eee9"
-font = "sans serif"
+font = "monospace"
 
 [browser]
 gatherUsageStats = false

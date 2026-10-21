@@ -15,7 +15,7 @@ import numpy as np
 
 from ..core.types import EvalContext, EvalResult, TaskType
 from ..principles import InspectionTarget
-from .base import Evaluator, register
+from .base import Evaluator, make_trace, register
 
 
 class RobustnessEvaluator(Evaluator):
@@ -29,11 +29,17 @@ class RobustnessEvaluator(Evaluator):
         "perturbation only -- it says nothing about *why* a model is or isn't "
         "stable, and never touches categorical/text features."
     )
+    formula = (
+        "x̃ = x + ε,  ε_j ~ N(0, (σ · std_j)²)   for every feature j\n"
+        "agreement_r = mean_i 1[f(x̃_i) = f(x_i)]          (repeat r = 1..R)\n"
+        "perturbation_stability = mean_r agreement_r\n"
+        "regression: agreement_r = max(0, 1 − mean|f(x̃)−f(x)| / mean|f(x)|)"
+    )
 
     def __init__(self, sigma: float = 0.1, n_repeats: int = 5, seed: int = 0):
         self.sigma = sigma
         self.n_repeats = n_repeats
-        self.rng = np.random.default_rng(seed)
+        self.seed = seed
 
     def evaluate(self, ctx: EvalContext) -> List[EvalResult]:
         X = np.asarray(ctx.dataset.X_test, dtype=float)
@@ -41,9 +47,10 @@ class RobustnessEvaluator(Evaluator):
         stds = X.std(axis=0, keepdims=True)
         stds[stds == 0] = 1.0
 
+        rng = np.random.default_rng(self.seed)
         agreements = []
         for _ in range(self.n_repeats):
-            noise = self.rng.normal(0, self.sigma, size=X.shape) * stds
+            noise = rng.normal(0, self.sigma, size=X.shape) * stds
             pert = ctx.model.predict(X + noise)
             if ctx.dataset.task == TaskType.CLASSIFICATION:
                 agreements.append(float(np.mean(pert == base)))
@@ -63,7 +70,16 @@ class RobustnessEvaluator(Evaluator):
             EvalResult(self.name, "safety", InspectionTarget.BEHAVIOR,
                        "perturbation_stability", stability, True, mechanism,
                        {"sigma": self.sigma, "n_repeats": self.n_repeats,
-                        "per_repeat_agreement": [round(a, 4) for a in agreements]}),
+                        "per_repeat_agreement": [round(a, 4) for a in agreements],
+                        "trace": make_trace(
+                            steps=[f"stability = mean({', '.join(f'{a:.4f}' for a in agreements)})"
+                                   f" = {stability:.4f}"],
+                            charts=[{"title": f"Prediction agreement per noise repeat (σ={self.sigma})",
+                                     "type": "bars",
+                                     "labels": [f"r{i + 1}" for i in range(len(agreements))],
+                                     "series": [{"name": "agreement",
+                                                 "values": [round(a, 4) for a in agreements]}]}],
+                        )}),
         ]
 
 
