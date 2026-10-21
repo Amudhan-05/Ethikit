@@ -88,9 +88,10 @@ python -m ethikit run --trace                         # synthetic data, every mo
 python -m ethikit run --data loans.csv --target approved --sensitive sex
 python -m ethikit list tools | models | datasets | params <name> | checklists
 python -m ethikit checklist deon --out answers.json   # governance checklist template
+python -m ethikit run --bundle audit.zip              # + the audit bundle (see below)
 ```
 
-Outputs go to `./ethikit_out/` (`report.html`, `model_cards/`, `results.json`); that folder is
+Outputs go to `./ethikit_out/` (`report.html`, `model_cards/` with `.html` + `.mct.json`, `results.json`); that folder is
 disposable. Everything is also pip-installable: `pip install -e .` adds an `ethikit` command.
 
 **Other entry points:** `python -m examples.run_demo` (original single-split demo),
@@ -147,6 +148,25 @@ ethikit explain --models decision_tree --row 4        # why this one row got its
 
 The **what-if** trains a fairness-constrained version of a model (fairlearn) and shows the cost
 before and after. It is a counterfactual: it never changes any audit score.
+
+## Hand it to a reviewer: the audit bundle
+
+```bash
+ethikit run --models logistic_regression,random_forest --bundle audit.zip
+ethikit bundle verify audit.zip          # re-runs it and compares every number
+ethikit datasheet --data loans.csv --target approved --sensitive sex   # datasheet for your data
+```
+
+One zip with everything a reviewer needs to **reproduce or challenge every number**: the config,
+all results, `metrics.csv`, every tool's worked maths, the report, the model cards (HTML, plus
+JSON in Google's Model Card Toolkit schema), a datasheet for the dataset (Gebru et al.; ethikit
+fills in what it can measure and leaves the human questions to you), the governance checklist
+answers, the library versions, a README and checksums. `bundle verify` reports any number that
+was edited or does not reproduce. The console has the same as an "export audit bundle" button.
+Every page also prints cleanly (light, no buttons, all sections open), so "Save as PDF" works.
+
+The four governance checklists record their edition and whether they are verbatim or a
+paraphrase; Deon is the verbatim upstream text (MIT, see THIRD_PARTY_NOTICES.md).
 
 ## Deep learning on tabular data (optional)
 

@@ -152,12 +152,12 @@ def prepare(config: Dict[str, Any], uploads: Optional[Dict[str, pd.DataFrame]] =
             continue
         if spec.get("estimator"):
             factory = estimator_from_path(spec["estimator"], params)
-            origins[name] = (f"A user-specified estimator <code>{spec['estimator']}</code>, "
+            origins[name] = (f"A user-specified estimator {spec['estimator']}, "
                              f"trained and evaluated on {ds.name}.")
         elif name in zoo:
             factory = with_params(zoo[name], params)
             if params:
-                origins[name] = (f"ethikit zoo model <code>{name}</code> ({family_of(name)} family) "
+                origins[name] = (f"ethikit zoo model {name} ({family_of(name)} family) "
                                  f"with user-set hyperparameters {', '.join(params)}, trained and "
                                  f"evaluated on {ds.name}.")
         else:

@@ -116,7 +116,7 @@ paid or hosted service, which would disqualify them). Closed API models are out 
 console with the same principle columns, formulas and model card, and the privacy tool shows a
 measurable difference between them.
 
-## M6 -- Reporting and governance completeness
+## M6 -- Reporting and governance completeness  **[BUILT -- NIST/ALTAI/Datasheets wording check by hand pending]**
 
 | # | Work | Size |
 |---|---|---|

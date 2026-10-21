@@ -130,3 +130,24 @@ def test_whatif_and_explain_endpoints(server):
     assert w["label"].startswith("counterfactual") and w["after"]["demographic_parity_diff"] < w["before"]["demographic_parity_diff"]
     e = json.loads(get(f"{server}/api/explain/{res['run_id']}/logistic_regression?row=3")[2])
     assert e["row"] == 3 and e["contributions"]
+
+
+def test_m6_card_json_datasheet_and_bundle_endpoints(server):
+    import io
+    import zipfile
+    res = run_stream(server, SMALL)[-1]
+    rid = res["run_id"]
+    st, ctype, body = get(f"{server}/api/card-json/{rid}/decision_tree")
+    doc = json.loads(body)
+    assert doc["schema_version"] == "0.0.2" and doc["model_details"]["name"] == "decision_tree"
+    sheet = json.loads(get(f"{server}/api/datasheet/{rid}")[2])
+    assert any(i["id"] == "composition.count" and i["answer"] for i in sheet["items"])
+    with post(f"{server}/api/datasheet/{rid}", {"answers": {"uses.not_for": "hiring"}}) as r:
+        saved = json.loads(r.read())
+    assert {i["id"]: i["filled_by"] for i in saved["items"]}["uses.not_for"] == "you"
+    assert b"hiring" in get(f"{server}/api/datasheet/{rid}?format=md")[2]
+    st, ctype, body = get(f"{server}/api/bundle/{rid}")
+    assert ctype == "application/zip"
+    names = zipfile.ZipFile(io.BytesIO(body)).namelist()
+    assert "ethikit_bundle/metrics.csv" in names and "ethikit_bundle/model_cards/decision_tree.mct.json" in names
+    assert b"hiring" in zipfile.ZipFile(io.BytesIO(body)).read("ethikit_bundle/datasheet.md")

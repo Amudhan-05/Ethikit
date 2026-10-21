@@ -235,7 +235,8 @@ def to_html(sheet: Dict[str, Any]) -> str:
                "<p class='open'>Not answered yet -- only the people who made or chose the data can answer this.</p>")
         by = f"<div class='by'>filled by {esc(it['filled_by'])}</div>" if it["filled_by"] else ""
         body.append(f"<div class='q'><b>{esc(it['question'])}</b> <code>{esc(it['id'])}</code>{ans}{by}</div>")
-    style = BASE + """body{max-width:860px}h1{font-size:24px}.q{margin:14px 0}.q p{margin:4px 0}
+    style = BASE + """body{max-width:860px}h1{font-size:24px}
+h2{font-size:15px;margin-top:30px;border-bottom:1px solid var(--rule);padding-bottom:6px}.q{margin:14px 0}.q p{margin:4px 0}
 .open{color:var(--gold);font-style:italic}.by{font-size:12px;color:var(--ink-faint);font-family:var(--font-mono)}"""
     return (f"<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, "
             f"initial-scale=1'><title>{esc(sheet['title'])}</title>{head_assets('datasheet')}<style>{style}</style>"

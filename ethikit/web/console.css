@@ -238,3 +238,9 @@ body.suite-mode .mine-only{display:none !important}
   .cmdline code{flex-basis:100%}
   .gitem{grid-template-columns:1fr}
 }
+
+/* datasheet (data-profile tab) */
+.ds-q{padding:8px 0; border-bottom:1px solid var(--rule)}
+.ds-q .q{font-family:var(--font-body); font-size:13.5px; color:var(--ink); margin-bottom:4px}
+.ds-q textarea{width:100%; background:var(--bg-raised); border:1px solid var(--rule-strong); border-radius:4px; padding:6px 8px; font-family:var(--font-body); font-size:13px; resize:vertical}
+.ds-q textarea:focus{outline:2px solid var(--accent); outline-offset:1px}

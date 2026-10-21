@@ -93,3 +93,35 @@
 .ek-theme button[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent)}
 .ek-theme button:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
 @media (max-width:640px){ .ek-path{display:none} .ek-nav{margin-left:0} }
+
+/* ---- print / save as PDF ----------------------------------------------------
+ * Every page (reports, model cards, datasheets, docs) prints on the light palette whatever
+ * the screen theme, without the title bar, toggle or buttons; collapsed sections are opened
+ * by theme.js before printing; tables and worked steps avoid splitting across pages. */
+@media print{
+  :root:root:root{
+    color-scheme: light;
+    --bg:#ffffff; --bg-raised:#ffffff; --bg-sunken:#f4f2ec;
+    --ink:#17211d; --ink-dim:#3f4b45; --ink-faint:#6b7770;
+    --rule:#d9d5ca; --rule-strong:#bdb7a7;
+    --accent:#2f6f57; --accent-ink:#ffffff; --accent-soft:#e4efe9; --accent-rule:#a9cbbb;
+    --gold:#7a5415; --gold-soft:#fbf1df; --gold-rule:#e3c48a;
+    --red:#9a4825; --red-soft:#f8e6dc; --red-rule:#e2b49b;
+    --blue:#3d6a8f; --blue-soft:#e8eff5; --blue-rule:#b3c8da;
+    --purple:#6b4d86; --purple-soft:#efe7f3; --purple-rule:#cdb9dc;
+    --mono-surface:#f4f2ec; --mono-ink:#17211d; --shadow:none;
+  }
+  @page{margin:16mm 14mm}
+  html,body{background:#fff !important; color:var(--ink)}
+  .ek-bar,.ek-nav,.ek-theme,button,.btn,.no-print{display:none !important}
+  .page,main{padding:0 !important; max-width:none !important}
+  *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  h1,h2,h3{break-after:avoid; page-break-after:avoid}
+  tr,li,pre,.note,figure,svg,details.tool summary{break-inside:avoid; page-break-inside:avoid}
+  thead{display:table-header-group}
+  pre{white-space:pre-wrap; overflow:visible}
+  tr:hover td,tr:hover th{background:none}
+  a{color:var(--ink)}
+  a[href^="http"]::after{content:" (" attr(href) ")"; font-size:.8em; color:var(--ink-faint); word-break:break-all}
+  details > summary{list-style:none}
+}

@@ -247,19 +247,36 @@ Measured on `--synthetic n=500 noise=2.5 n_features=12 seed=7`, network (256, 25
 | M5.7 | `python -m ethikit run --models torch_mlp --tools captum_ig` then console **inspect** -> `captum_ig` | a per-feature bar chart and a "completeness" line with an error near 0 (≈ 1e-3) |
 | M5.8 | Save a network: `python -c "import torch,ethikit.deep as d,ethikit.data as D; from ethikit.data import loaders as L; ds=D.split_dataset(L.make_synthetic_fairness_raw()); torch.save(d.TorchMLPClassifier(epochs=5).fit(ds.X_train,ds.y_train).module_,'net.pt')"` then `python -m ethikit run --model-file net=net.pt --tools performance,captum_ig` | `net` is audited like any zoo model, Captum included |
 
-## M6 -- Reporting and governance
+## M6 -- Reporting and governance  *(built)*
 
 **Automated**
-- `pytest tests/test_bundle.py` -- the audit bundle contains config, results, report, cards, traces, checklist answers and a README; re-running from its `config.json` reproduces `results.json` exactly.
-- `pytest tests/test_modelcard_json.py` -- the exported card validates against the Model Card JSON schema.
-- `pytest tests/test_checklists_source.py` -- every checklist records source version and date; item counts match the recorded originals.
-- `pytest tests/test_datasheet.py` -- pre-filled sections match the dataset profile numbers.
+
+| Test | What it guarantees |
+|---|---|
+| `pytest tests/test_modelcard_json.py` | every `<model>.mct.json` validates against Google's Model Card Toolkit schema v0.0.2 (vendored); it carries the run's exact numbers, each tool's limits, requirement failures and data-profile risks; the schema rejects unknown fields |
+| `pytest tests/test_datasheet.py` | pre-filled datasheet answers match the profile's numbers (rows, positive rate, groups, base-rate gap, proxy AUC, split); human-only questions stay open; your answers override and are attributed to "you"; published dataset facts are only used when that dataset was actually loaded (not on the offline synthetic fallback) |
+| `pytest tests/test_bundle.py` | the bundle has every promised file and its README lists each one; re-running `config.json` reproduces every metric exactly; an edited number is caught twice (checksum + re-run); zip bundles and the CLI work |
+| `pytest tests/test_checklists_source.py` | every checklist records version, date, verbatim/paraphrased and per-item references; Deon is the verbatim upstream text (fingerprint); a verification date is only claimed when a comparison was actually made; NIST/ALTAI references name real parts of the original |
+| ... `test_deon_still_matches_upstream` (`-m network`, needs github.com) | re-fetches the pinned upstream Deon checklist and compares item by item |
+| `pytest tests/test_server.py -k m6` | `/api/card-json`, `/api/datasheet` (GET + POST answers), `/api/bundle` (zip) |
+| `pytest -m e2e -k m6` | console: bundle download, `.mct.json` link, datasheet answers saved; a dark-theme model card prints on white with no title bar, every section expanded, as a real PDF |
 
 **Manual / visual**
-1. Click **export audit bundle**; open the folder; **see** every file listed in its README.
-2. Print-preview a model card (Ctrl/Cmd+P); **see** a clean light layout with no title bar or buttons.
-3. Open the datasheet; **see** composition numbers already filled in, motivation/collection sections waiting for you.
-4. Compare one checklist item against the original source; **see** the recorded version/date and a note where wording was paraphrased.
+
+| # | Do this | You should see |
+|---|---|---|
+| M6.1 | `python -m ethikit run --models logistic_regression,random_forest --bundle audit.zip` | the run as usual, then `wrote audit bundle audit.zip` |
+| M6.2 | unzip it; open `ethikit_bundle/README.md` | dataset, models, Pareto front, requirements, checklist and datasheet status; a "Reproduce it" block; a table listing every file in the folder |
+| M6.3 | `python -m ethikit bundle verify audit.zip` | `compared N metrics` and `✓ bundle verified` (takes as long as the run) |
+| M6.4 | Challenge it: unzip, change any number in `metrics.csv`, then `python -m ethikit bundle verify ethikit_bundle` | `changed since the bundle was made: metrics.csv`, the metric with "bundle X vs re-run Y", and `✗ bundle did NOT verify` (exit code 1) |
+| M6.5 | Open `model_cards/random_forest.mct.json` | plain JSON: `model_details`, `model_parameters` (hyperparameters), `quantitative_analysis` (every metric), `considerations` (limits, trade-offs, risks) |
+| M6.6 | `python -m ethikit datasheet --data synthetic` then open `ethikit_out/datasheet.html` | composition numbers filled in (rows, groups, base rates, proxy AUC); each answer says who filled it in |
+| M6.7 | `python -m ethikit datasheet --data loans.csv --target approved --sensitive sex` (any CSV of yours) | motivation, collection, consent, licence and "should NOT be used for" left open in gold italics; `datasheet_answers.json` lists exactly those; fill one in and re-run with `--answers ethikit_out/datasheet_answers.json` -> "filled by you" |
+| M6.8 | Checklist provenance: console **governance**, pick each checklist | under the intro: edition, date, "verbatim"/"paraphrase", verified or not; Deon has "provenance notes" explaining the A.4/C.4 drift that was fixed. For NIST AI RMF open the original (nist.gov) and check 2-3 items' "original: GOVERN 1.1"-style references; for ALTAI check the requirement/sub-section names. These three could not be fetched from the build machine, so **your check is the verification** |
+| M6.9 | Console: run, then **results** -> "export audit bundle (.zip)" | a zip downloads; `ethikit bundle verify` on it passes |
+| M6.10 | Console **data-profile** -> scroll to "datasheet for the dataset" | pre-filled answers with "filled by ..."; text boxes for the open ones; type one, "save answers" -> ✓ saved; "download .md" contains it; export the bundle again -> its `datasheet.md` contains it |
+| M6.11 | Console **model-card** -> "download .mct.json" | the JSON card for the selected model |
+| M6.12 | Open any model card (or the report, or a datasheet) in **dark** theme and print preview (Ctrl/Cmd+P) | white page, dark text, no title bar or ☀/☾ buttons; every "How each number was computed" section expanded; tables not cut in half; "Save as PDF" works |
 
 ## M7 -- Finish and polish
 

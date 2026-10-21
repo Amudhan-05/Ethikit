@@ -280,3 +280,40 @@ def test_charts_never_draw_negative_heights(page):
     page.wait_for_selector("#tab-inspect .chart rect.bar", timeout=30000)
     heights = page.eval_on_selector_all("svg.chart rect", "els => els.map(e => parseFloat(e.getAttribute('height')))")
     assert heights and min(heights) > 0
+
+
+def test_m6_bundle_button_card_json_and_datasheet(page):
+    _fast_run(page)
+    link = page.locator("#bundle-dl")
+    assert link.get_attribute("href").startswith("api/bundle/")
+    with page.expect_download() as dl:
+        link.click()
+    assert dl.value.suggested_filename == "ethikit_bundle.zip"
+    page.click("[data-tab=card]")
+    assert page.locator("#tab-card a", has_text=".mct.json").count() == 1
+    page.click("[data-tab=data]")
+    page.wait_for_selector("#datasheet .ds-q")
+    box = page.locator("#datasheet textarea[data-q='uses.not_for']")
+    box.fill("credit decisions about real people")
+    page.click("#ds-save")
+    page.wait_for_selector("#ds-status .ok")
+    assert page.errors == []
+
+
+def test_m6_model_card_prints_light_without_chrome(browser, server):
+    ctx = browser.new_context(color_scheme="dark")
+    pg = ctx.new_page()
+    pg.goto(server + "/")
+    pg.wait_for_selector("#models .chip")
+    _fast_run(pg)
+    rid = pg.locator("#bundle-dl").get_attribute("href").split("/")[-1]
+    card = ctx.new_page()
+    card.goto(f"{server}/api/card/{rid}/{pg.locator('#tab-card select option').first.inner_text()}")
+    assert card.evaluate("getComputedStyle(document.body).backgroundColor") != "rgb(255, 255, 255)"   # dark on screen
+    card.emulate_media(media="print")
+    assert card.evaluate("getComputedStyle(document.body).backgroundColor") == "rgb(255, 255, 255)"
+    assert card.evaluate("getComputedStyle(document.querySelector('.ek-bar')).display") == "none"
+    card.evaluate("window.dispatchEvent(new Event('beforeprint'))")
+    assert card.evaluate("document.querySelectorAll('details:not([open])').length") == 0
+    assert card.pdf()[:4] == b"%PDF"
+    ctx.close()

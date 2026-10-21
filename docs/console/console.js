@@ -577,7 +577,7 @@
         S.result = e;
         $("#run-label").textContent = e.dataset + " · " + Object.keys(e.objective).length + " models";
         G && G.final(e);
-        renderResults(); renderInspect(); renderCardTab(); if (S.live) renderHistory();
+        renderResults(); renderInspect(); renderCardTab(); renderDatasheet(); if (S.live) renderHistory();
         log("ok", "pareto front: " + e.pareto.join(", "));
         break;
     }
@@ -849,7 +849,9 @@
       "<div class='note'>Scores are relative to this dataset and this split. The same model can score differently on other data — try <code>--synthetic minority_share=0.15</code> or your own CSV, or vary <code>--seed</code>.</div>" +
       (r.notes || []).map(function (n) { return "<div class='note'>" + esc(n) + "</div>"; }).join("") +
       requirementsHtml(r) + stabilityHtml(r) + (S.live && r.task === "classification" ? whatifHtml(r) : "") +
-      (S.live ? "<p style='margin-top:12px'><a class='btn' href='api/report/" + esc(r.run_id) + "' target='_blank' rel='noopener'>open aggregate report ↗</a></p>" : "") +
+      (S.live ? "<p style='margin-top:12px'><a class='btn' href='api/report/" + esc(r.run_id) + "' target='_blank' rel='noopener'>open aggregate report ↗</a> " +
+        "<a class='btn primary' id='bundle-dl' href='api/bundle/" + esc(r.run_id) + "' download='ethikit_bundle.zip'>export audit bundle (.zip)</a></p>" +
+        "<p class='dim small'>One zip a reviewer can use to reproduce or challenge every number: config, results, metrics.csv, traces, report, model cards (+ Model Card Toolkit JSON), datasheet, checklist answers, a README and checksums. Check it with <code>ethikit bundle verify ethikit_bundle.zip</code>.</p>" : "") +
       "</div></div>";
     radar($("#radar"), sc);
     if ($("#wi-run")) $("#wi-run").addEventListener("click", runWhatif);
@@ -886,6 +888,45 @@
       "<div><h3>proxy screen</h3><p class='prose small'>" + (px.auc != null ? "Other features predict the sensitive attribute with <b>AUC " + fmt(px.auc) + "</b> (0.5 = no information). " + esc(px.method || "") : esc(px.reason || "not available")) + "</p>" +
       (top ? "<div class='tscroll'><table class='t'><tr><th>feature</th><th>mutual information</th></tr>" + top + "</table></div>" : "") +
       (miss ? "<h3 style='margin-top:12px'>missing before imputation</h3><div class='tscroll'><table class='t'><tr><th>column</th><th>missing</th></tr>" + miss + "</table></div>" : "") + "</div></div>";
+  }
+
+  // datasheet (Gebru et al.): pre-filled by the server from the profile; open questions are yours
+  function renderDatasheet() {
+    var box = $("#tab-data"); var r = S.result;
+    var old = $("#datasheet"); if (old) old.remove();
+    if (!S.live || !r || !r.run_id) return;
+    var sec = el("div", { id: "datasheet" });
+    box.appendChild(sec);
+    var base = "api/datasheet/" + encodeURIComponent(r.run_id);
+    fetch(base).then(function (x) { return x.json(); }).then(draw)
+      .catch(function (e) { sec.innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+    function draw(sheet) {
+      if (sheet.error) { sec.innerHTML = "<p class='err'>" + esc(sheet.error) + "</p>"; return; }
+      var done = sheet.items.filter(function (i) { return i.answer; }).length;
+      var h = "<h3 style='margin-top:18px'>datasheet for the dataset</h3><p class='prose'>After " + esc(sheet.after) +
+        ". ethikit filled in <b>" + done + " of " + sheet.items.length + "</b> questions from the data and the run; the rest only the people who made or chose the data can answer. " +
+        "Your answers go into the datasheet, the audit bundle and nowhere else.</p>" +
+        "<div class='ins-bar'><button class='btn primary' type='button' id='ds-save'>save answers</button>" +
+        "<a class='btn' href='" + base + "?format=html' target='_blank' rel='noopener'>open ↗</a>" +
+        "<a class='btn' href='" + base + "?format=md' download='datasheet.md'>download .md</a><span class='dim small' id='ds-status'></span></div>";
+      var secName = null;
+      sheet.items.forEach(function (i) {
+        if (i.section !== secName) { secName = i.section; h += "<div class='gsec'>" + esc(secName) + "</div>"; }
+        h += "<div class='ds-q'><div class='q'>" + esc(i.question) + " <span class='dim small'>" + esc(i.id) + "</span></div>" +
+          (i.answer && i.filled_by !== "you" ? "<div class='prose small'>" + esc(i.answer) + "</div><div class='dim small'>filled by " + esc(i.filled_by) + "</div>"
+            : "<textarea rows='2' data-q='" + esc(i.id) + "' aria-label='" + esc(i.question) + "' placeholder='yours to answer'>" + esc(i.answer || "") + "</textarea>") + "</div>";
+      });
+      sec.innerHTML = h;
+      $("#ds-save").addEventListener("click", function () {
+        var answers = {};
+        sec.querySelectorAll("textarea[data-q]").forEach(function (t) { if (t.value.trim()) answers[t.getAttribute("data-q")] = t.value; });
+        fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: answers }) })
+          .then(function (x) { return x.json(); }).then(function (res) {
+            if (res.error) throw new Error(res.error);
+            $("#ds-status").innerHTML = "<span class='ok'>✓ saved</span> — included in the audit bundle";
+          }).catch(function (e) { $("#ds-status").innerHTML = "<span class='err'>" + esc(e.message) + "</span>"; });
+      });
+    }
   }
 
   function renderHistory() {
@@ -1112,8 +1153,10 @@
     scored().models.forEach(function (m) { ms.appendChild(el("option", { value: m }, esc(m))); });
     var open = el("a", { class: "btn", target: "_blank", rel: "noopener" }, "open ↗");
     var dl = el("a", { class: "btn" }, "download .html");
+    var js = el("a", { class: "btn" }, "download .mct.json");
+    js.title = "the same card in Google's Model Card Toolkit JSON schema";
     bar.appendChild(el("span", { class: "dim" }, "model card for")); bar.appendChild(ms);
-    bar.appendChild(open); bar.appendChild(dl);
+    bar.appendChild(open); bar.appendChild(dl); if (S.live) bar.appendChild(js);
     bar.appendChild(el("span", { class: "dim small" }, "includes every formula + intermediate table, and your governance checklist once attached"));
     var frame = el("iframe", { class: "card", title: "Model card" });
     box.appendChild(bar); box.appendChild(frame);
@@ -1122,6 +1165,8 @@
       if (S.live) {
         var u = "api/card/" + encodeURIComponent(r.run_id) + "/" + encodeURIComponent(m) + "?v=" + Date.now();
         frame.removeAttribute("srcdoc"); frame.src = u; open.href = u; dl.href = u;
+        js.href = "api/card-json/" + encodeURIComponent(r.run_id) + "/" + encodeURIComponent(m);
+        js.setAttribute("download", m + ".mct.json");
       } else {
         var html = (S.replay.cards || {})[m] || "";
         frame.srcdoc = html;
@@ -1154,7 +1199,9 @@
     box.appendChild(bar);
     box.appendChild(el("p", { class: "prose" }, "Accountability, human oversight and well-being can't be measured from a model and a dataset — no tool can. " +
       "What a team <i>can</i> do is answer a recognised checklist and keep the answers next to the metrics. Source: <a href='" + esc(c.url) + "' target='_blank' rel='noopener'>" +
-      esc(c.source) + "</a>. " + esc(c.scope) + " Items are ethikit's condensed paraphrase — use the original for a formal audit."));
+      esc(c.source) + "</a>. " + esc(c.scope) + " " + esc(c.provenance.line) +
+      (c.provenance.drift_notes.length ? " <details class='small'><summary>provenance notes</summary>" +
+        c.provenance.drift_notes.map(function (n) { return "<p>" + esc(n) + "</p>"; }).join("") + "</details>" : "")));
     var grid = el("div", { class: "gov-grid" });
     var left = el("div"), right = el("div", { class: "sticky" });
     var sec = null;
@@ -1162,7 +1209,8 @@
       if (it.section !== sec) { sec = it.section; left.appendChild(el("div", { class: "gsec" }, esc(sec))); }
       var a = S.answers[it.id] || {};
       var row = el("div", { class: "gitem" }, "<span class='id'>" + esc(it.id) + "</span>");
-      var body = el("div", null, "<div class='q'>" + esc(it.text) + "</div><div class='tags'>→ " + it.principles.map(esc).join(", ") + "</div>");
+      var body = el("div", null, "<div class='q'>" + esc(it.text) + "</div><div class='tags'>→ " + it.principles.map(esc).join(", ") +
+        (it.ref && it.ref !== it.section ? " · original: " + esc(it.ref) : "") + "</div>");
       var ctl = el("div", { class: "ctl" });
       ["yes", "partial", "no", "n/a"].forEach(function (v) {
         var lab = el("label", { class: v.replace("/", "") }, "");
@@ -1225,7 +1273,7 @@
     return out;
   }
   function toMarkdown(c) {
-    var lines = ["# " + c.name, "", "Source: " + c.source + " -- " + c.url, "", "_Condensed, paraphrased items via ethikit; use the original for a formal audit._"];
+    var lines = ["# " + c.name, "", "Source: " + c.source + " -- " + c.url, "", "_" + c.provenance.line + "_"];
     var sec = null;
     c.items.forEach(function (it) {
       if (it.section !== sec) { sec = it.section; lines.push("", "## " + sec, ""); }

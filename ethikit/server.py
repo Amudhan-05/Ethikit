@@ -147,6 +147,23 @@ class Handler(BaseHTTPRequestHandler):
                 run = RUNS[run_id]
                 row = int(parse_qs(url.query).get("row", ["0"])[0])
                 return self._json(explain_row(_fitted(run, model), run["prepared"].dataset, row))
+            if path.startswith("/api/datasheet/"):
+                from . import datasheet as ds_mod
+                sheet = self._datasheet(path.rsplit("/", 1)[1])
+                fmt = parse_qs(url.query).get("format", ["json"])[0]
+                if fmt == "md":
+                    return self._send(200, ds_mod.to_markdown(sheet).encode(), "text/markdown; charset=utf-8",
+                                      {"Content-Disposition": 'attachment; filename="datasheet.md"'})
+                if fmt == "html":
+                    return self._send(200, ds_mod.to_html(sheet).encode(), "text/html; charset=utf-8")
+                return self._json(sheet)
+            if path.startswith("/api/bundle/"):
+                from .bundle import bundle_bytes
+                run = RUNS[path.rsplit("/", 1)[1]]
+                data = bundle_bytes(run["config"], run["summary"], run.get("checklist"),
+                                    run.get("datasheet_answers"))
+                return self._send(200, data, "application/zip",
+                                  {"Content-Disposition": 'attachment; filename="ethikit_bundle.zip"'})
             if path.startswith("/api/report/"):
                 run = RUNS[path.rsplit("/", 1)[1]]
                 s = run["summary"]
@@ -210,6 +227,11 @@ class Handler(BaseHTTPRequestHandler):
                                      "not a pre-trained upload")
                 return self._json(mitigate(p.dataset, p.factories[body["model"]], body.get("method", "exponentiated_gradient"),
                                            body.get("constraint", "demographic_parity"), seed=p.dataset_seed))
+            if url.path.startswith("/api/datasheet/"):
+                run_id = url.path.rsplit("/", 1)[1]
+                answers = json.loads(self._body() or b"{}").get("answers") or {}
+                RUNS[run_id]["datasheet_answers"] = {k: str(v) for k, v in answers.items()}
+                return self._json(self._datasheet(run_id))
             if url.path.startswith("/api/checklist/"):
                 run_id = url.path.rsplit("/", 1)[1]
                 data = json.loads(self._body() or b"{}")
@@ -230,6 +252,15 @@ class Handler(BaseHTTPRequestHandler):
         if ctype.startswith("text/") or ctype.endswith("javascript"):
             ctype += "; charset=utf-8"
         self._send(200, target.read_bytes(), ctype)
+
+    @staticmethod
+    def _datasheet(run_id: str) -> dict:
+        from . import datasheet as ds_mod
+        run = RUNS[run_id]
+        s = run["summary"]
+        sheet = ds_mod.build_datasheet(s.get("profile") or {"dataset": s["dataset"]}, run["config"],
+                                       s.get("feature_names"))
+        return ds_mod.merge_answers(sheet, run.get("datasheet_answers") or {})
 
     @staticmethod
     def _card_args(run_id: str, model: str):

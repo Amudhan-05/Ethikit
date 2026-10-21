@@ -30,6 +30,18 @@
 
   window.addEventListener("storage", function (e) { if (e.key === KEY) apply(e.newValue); });
 
+  // Printing / saving as PDF: open every collapsed section so the worked maths is on paper,
+  // then put them back as they were.
+  var reopened = [];
+  window.addEventListener("beforeprint", function () {
+    reopened = Array.prototype.filter.call(document.querySelectorAll("details:not([open])"), function (d) {
+      d.setAttribute("open", ""); return true;
+    });
+  });
+  window.addEventListener("afterprint", function () {
+    reopened.forEach(function (d) { d.removeAttribute("open"); }); reopened = [];
+  });
+
   function toggle() {
     var el = document.createElement("span");
     el.className = "ek-theme";
