@@ -278,6 +278,13 @@
           on ? S.models.add(m) : S.models.delete(m); renderAdvanced(); update();
         }));
       });
+      if (fam === "deep" && !isRegression()) {
+        var opt = S.meta.optional_models || {};
+        Object.keys(opt).forEach(function (m) {
+          var c = chip(m, false, true, function () {}, "not installed — " + opt[m]);
+          c.title = "To enable: " + opt[m]; row.appendChild(c);
+        });
+      }
       box.appendChild(row);
     });
     renderAdvanced();

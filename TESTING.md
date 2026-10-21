@@ -209,18 +209,43 @@ python -m pytest -m e2e -k "whatif or explains or negative"
 | M4.9 | Console **inspect** -> `art_robustness` | the first worked step lists the attack budget |
 | M4.10 | Model card -> "How each number was computed" | every tool shows "What this does not measure" |
 
-## M5 -- Deep learning
+## M5 -- Deep learning  *(built)*
+
+Setup for the torch checks (the others need nothing extra):
+`pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install captum opacus`
 
 **Automated**
-- `pytest tests/test_adapters.py` -- sklearn, PyTorch and Keras-style wrappers all expose `fit/predict/predict_proba` and pass the evaluator contract test.
-- `pytest tests/test_captum.py` -- integrated-gradients attributions sum (within tolerance) to prediction minus baseline (the completeness property).
-- `pytest tests/test_dp.py` -- the DP-trained MLP reports its epsilon; its membership-inference advantage is <= the non-private one on the same data.
-- `python -m ethikit run --models mlp,mlp_dp --tools membership_inference,performance` -- runs end to end.
+
+| Test | What it guarantees |
+|---|---|
+| `pytest tests/test_deep.py` | scikit-learn `mlp` is in the **deep** family and passes every tool; the Keras-style adapter (a `.predict` that returns probabilities, 1 or 2 columns) and `adapt()` behave; runs without torch |
+| `pytest tests/test_deep_torch.py` (skips without torch) | `torch_mlp` clones and is deterministic for a fixed seed; a raw `nn.Module` and a saved `.pt` file are evaluated and give identical probabilities |
+| ... `test_captum_attributions_satisfy_completeness` | integrated gradients add up to f(x) − f(baseline) (mean error < 0.01) |
+| ... `test_captum_does_not_apply_to_non_torch_models` | Captum is skipped (not faked) for models without a network |
+| ... `test_dp_training_reports_its_budget...` | the DP model records epsilon ≤ target and delta; its membership-inference advantage is at least 0.1 below the plain overfitted network's |
+| ... `test_captum_works_on_a_dp_trained_model` | regression: Opacus hooks are removed after training, so Captum runs on DP models |
+| `pytest tests/test_evaluators.py` | the contract test now includes `captum_ig` |
+
+Measured on `--synthetic n=500 noise=2.5 n_features=12 seed=7`, network (256, 256), 150 epochs:
+
+| model | epsilon | train acc | test acc | membership-inference advantage |
+|---|---|---|---|---|
+| plain | -- | 1.000 | 0.620 | 0.407 |
+| DP | 8 | 0.717 | 0.680 | 0.100 |
+| DP | 1 | 0.680 | 0.673 | 0.053 |
 
 **Manual / visual**
-1. Console model list: a **deep** family appears; its advanced panel shows layers / learning rate / epochs.
-2. Run `mlp` vs `mlp_dp`; **see** a privacy bar difference on the radar and a utility drop, plus the epsilon in the model card.
-3. Inspect Captum; **see** a per-feature bar chart and a "completeness check" line showing the sum matches.
+
+| # | Do this | You should see |
+|---|---|---|
+| M5.1 | `python -m ethikit list models` | a **deep** family: `mlp`, `mlp_reg`, and (with torch) `torch_mlp`, `torch_mlp_dp` |
+| M5.2 | Console without torch installed: open the **deep** family | `mlp` selectable; `torch_mlp`/`torch_mlp_dp` greyed out, hover says the pip command |
+| M5.3 | Console with torch: select `torch_mlp`, open **advanced** | hidden_layers, learning_rate, epochs, batch_size, dropout, dp, target_epsilon editable |
+| M5.4 | the DP showcase (one command, ~10 s): `python -m ethikit run --synthetic n=500 noise=2.5 n_features=12 seed=7 --seed 7 --models torch_mlp,torch_mlp_dp --model-param torch_mlp.hidden_layers="(256,256)" --model-param torch_mlp.epochs=150 --model-param torch_mlp.learning_rate=0.003 --model-param torch_mlp_dp.hidden_layers="(256,256)" --model-param torch_mlp_dp.epochs=150 --model-param torch_mlp_dp.learning_rate=0.003 --model-param torch_mlp_dp.target_epsilon=1 --tools performance,membership_inference` | `torch_mlp` advantage ≈ 0.41, `torch_mlp_dp` ≈ 0.05; accuracy 0.62 vs 0.67 |
+| M5.5 | open `ethikit_out/model_cards/torch_mlp_dp.html` | "differential privacy: epsilon = 1.00 (smaller = stronger guarantee), delta = …" in the privacy section |
+| M5.6 | Console: same run (paste the settings, or **import config** after `--export-config`), **inspect** -> `torch_mlp_dp` × `membership_inference` | the first worked step names the DP budget |
+| M5.7 | `python -m ethikit run --models torch_mlp --tools captum_ig` then console **inspect** -> `captum_ig` | a per-feature bar chart and a "completeness" line with an error near 0 (≈ 1e-3) |
+| M5.8 | Save a network: `python -c "import torch,ethikit.deep as d,ethikit.data as D; from ethikit.data import loaders as L; ds=D.split_dataset(L.make_synthetic_fairness_raw()); torch.save(d.TorchMLPClassifier(epochs=5).fit(ds.X_train,ds.y_train).module_,'net.pt')"` then `python -m ethikit run --model-file net=net.pt --tools performance,captum_ig` | `net` is audited like any zoo model, Captum included |
 
 ## M6 -- Reporting and governance
 

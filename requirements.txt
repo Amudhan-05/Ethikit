@@ -39,8 +39,13 @@ scikit-posthocs>=0.9    # Nemenyi post-hoc + critical-difference diagram
 # (0.8.11) hard-pins pandas~=1.4, which has no Python 3.12 wheel and fails to
 # build from source here (confirmed by hand); its own attack algorithm is
 # implemented natively instead of pulling the unmaintained package in.
-# opacus               # DP-SGD for PyTorch (not wired in; no evaluator needs it yet)
 
-# Phase 4 (deep learning + LLMs)
-# captum               # DL explainability
+# Deep learning (M5), optional. Without these the "deep" family still has scikit-learn's MLP.
+# CPU-only wheels are much smaller than the default CUDA ones:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install captum opacus
+# torch                # torch_mlp model
+# captum               # captum_ig tool (integrated gradients)
+# opacus               # torch_mlp_dp model (DP-SGD)
+
+# Extended work, not wired in (LLM track; see ROADMAP)
 # deepeval             # LLM evaluation + red-teaming (deepteam)

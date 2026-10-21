@@ -14,6 +14,7 @@ from sklearn.ensemble import (
 )
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.naive_bayes import GaussianNB
+from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
@@ -37,6 +38,12 @@ CLASSIFIERS: Dict[str, Dict[str, Callable]] = {
     "kernel": {
         "svc": lambda: SVC(probability=True, random_state=0),
     },
+    # deep learning on tabular data (M5). scikit-learn's MLP is always available; the PyTorch MLP
+    # and its differentially-private twin are added below when torch / opacus are installed.
+    "deep": {
+        "mlp": lambda: MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=300, early_stopping=True,
+                                     random_state=0),
+    },
 }
 
 # family -> {model_name: factory}, mirroring CLASSIFIERS' families for regression
@@ -53,7 +60,26 @@ REGRESSORS: Dict[str, Dict[str, Callable]] = {
     "instance_based": {
         "knn_reg": lambda: KNeighborsRegressor(),
     },
+    "deep": {
+        "mlp_reg": lambda: MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=300, early_stopping=True,
+                                        random_state=0),
+    },
 }
+
+
+def _register_torch_models() -> None:
+    """PyTorch models join the 'deep' family only if torch is importable (and DP only with opacus)."""
+    from ..deep import TorchMLPClassifier, has_opacus, has_torch
+    if has_torch():
+        CLASSIFIERS["deep"]["torch_mlp"] = lambda: TorchMLPClassifier()
+        if has_opacus():
+            CLASSIFIERS["deep"]["torch_mlp_dp"] = lambda: TorchMLPClassifier(dp=True)
+
+
+_register_torch_models()
+
+#: what to install to unlock models that aren't registered on this machine
+OPTIONAL_MODELS = {"torch_mlp": "pip install torch", "torch_mlp_dp": "pip install torch opacus"}
 
 
 def flat_classifiers() -> Dict[str, Callable]:
@@ -137,10 +163,18 @@ def load_fitted_model(path: str):
     must accept the same feature columns ethikit builds from your data (see
     prepare_frame), and -- if you trained it on unscaled features -- run with
     scaling disabled (`--no-scale`)."""
+    from ..deep import adapt
+    low = str(path).lower()
+    if low.endswith((".pt", ".pth")):
+        import torch
+        return adapt(torch.load(path, weights_only=False))
+    if low.endswith((".keras", ".h5")):
+        import keras                                   # only when you actually load a Keras file
+        return adapt(keras.models.load_model(path))
     try:
         import joblib
-        return joblib.load(path)
+        return adapt(joblib.load(path))
     except ImportError:
         import pickle
         with open(path, "rb") as fh:
-            return pickle.load(fh)
+            return adapt(pickle.load(fh))

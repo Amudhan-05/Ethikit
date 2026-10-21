@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232f6f57'/%3E%3Ctext x='3' y='12' font-family='monospace' font-size='11' fill='white'%3E%C2%BB%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
 <script src="theme.js" data-path="console" data-nav="console"></script>
@@ -94,6 +95,15 @@
             <span id="model-file-info" class="dim small">optional: your own pre-trained sklearn-compatible model, evaluated as-is (only load files you trust)</span>
           </div>
         </div>
+        <div class="line mine-only"><span class="flag">--require</span>
+          <div class="val">
+            <input type="text" id="req-input" list="req-metrics" size="34" placeholder="demographic_parity_diff<=0.1" aria-label="requirement">
+            <datalist id="req-metrics"></datalist>
+            <button class="btn" id="req-add" type="button">add</button>
+            <span id="req-list" class="chips"></span>
+            <span id="req-err" class="err small"></span>
+          </div>
+        </div>
         <div class="line"><span class="flag">--tools</span>
           <div class="val"><div id="tools" class="chips"></div></div>
         </div>
@@ -120,6 +130,8 @@
       <div class="cmdline">
         <code id="cmd-preview"></code>
         <button class="btn" id="copy" type="button">copy</button>
+        <button class="btn" id="export-config" type="button" title="download this run's config as JSON">export config</button>
+        <label class="btn" title="load a config.json, results.json or saved run config">import config<input type="file" id="import-config" accept=".json,application/json" hidden></label>
         <button class="btn primary" id="run" type="button">⏎ run</button>
       </div>
     </div>
@@ -142,13 +154,17 @@
       <button role="tab" aria-selected="true" data-tab="results">results</button>
       <button role="tab" aria-selected="false" data-tab="inspect">inspect</button>
       <button role="tab" aria-selected="false" data-tab="card">model-card</button>
+      <button role="tab" aria-selected="false" data-tab="data">data-profile</button>
       <button role="tab" aria-selected="false" data-tab="suite">reference-suite</button>
+      <button role="tab" aria-selected="false" data-tab="history">history</button>
       <button role="tab" aria-selected="false" data-tab="gov">governance</button>
       <span class="right" id="run-label"></span>
     </div>
     <div class="panel" id="tab-results" role="tabpanel"><div class="empty">no run yet</div></div>
     <div class="panel" id="tab-inspect" role="tabpanel" hidden><div class="empty">no run yet</div></div>
     <div class="panel" id="tab-card" role="tabpanel" hidden><div class="empty">no run yet</div></div>
+    <div class="panel" id="tab-data" role="tabpanel" hidden><div class="empty">the data profile appears here as soon as a run starts — before any model is trained</div></div>
+    <div class="panel" id="tab-history" role="tabpanel" hidden><div class="empty">loading…</div></div>
     <div class="panel" id="tab-suite" role="tabpanel" hidden><div class="empty">no suite run yet — choose <b>--mode reference suite</b> above</div></div>
     <div class="panel" id="tab-gov" role="tabpanel" hidden></div>
   </section>

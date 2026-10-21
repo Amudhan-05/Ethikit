@@ -65,7 +65,7 @@ ethikit runs entirely on your machine: no accounts, no hosting, nothing leaves y
 **1. Set up** (Python 3.12 is the project standard; 3.13 runs but the drift tool can't install there)
 
 ```bash
-git clone https://github.com/Amudhan-05/ethikit && cd ethikit
+git clone https://github.com/AmudhanS-05/Ethikit && cd Ethikit
 python3.12 -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt                            # everything, incl. optional tools
 # minimal alternative: pip install -r requirements-core.txt # scikit-learn only; tools needing
@@ -135,7 +135,7 @@ ethikit run ... --export-config my_audit.json                        # save a co
 - **History**: every run is saved locally (`ETHIKIT_RUNS` to move it); diff two runs, or reload
   one's config in the console's *history* tab. *export config* / *import config* do the same by file.
 
-## Tools (13) and the what-if
+## Tools (14) and the what-if
 
 Every principle a tool can measure has at least two independent tools, and every tool says what
 it does **not** measure (shown in *inspect* and on the model card). `ethikit list tools` lists them.
@@ -147,6 +147,29 @@ ethikit explain --models decision_tree --row 4        # why this one row got its
 
 The **what-if** trains a fairness-constrained version of a model (fairlearn) and shows the cost
 before and after. It is a counterfactual: it never changes any audit score.
+
+## Deep learning on tabular data (optional)
+
+"Tabular" = spreadsheet-shaped data: one row per case, one column per feature. The **deep**
+family always has scikit-learn's `mlp`. Install PyTorch to add two more (CPU wheels are small):
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install captum opacus
+python -m ethikit run --family deep --tools performance,membership_inference,captum_ig
+```
+
+- `torch_mlp` -- a small PyTorch network that speaks scikit-learn, so every tool, the console
+  and the model card treat it like any other model (layers, learning rate, epochs are tunable).
+- `torch_mlp_dp` -- the same network trained with **differential privacy** (DP-SGD, Opacus).
+  Its model card states the privacy budget actually spent (epsilon, delta).
+- `captum_ig` -- integrated gradients read from the network itself, with a completeness check
+  (the attributions must add up to the change in the prediction).
+
+On small, noisy data a large plain network memorises its training set; the DP version does not.
+One measured example (TESTING.md, M5): membership-inference advantage **0.41 → 0.05** at
+epsilon = 1, with test accuracy 0.62 → 0.67. DP can also *widen* a fairness gap (it costs
+accuracy most on small groups), so look at the fairness column too -- that is the trade-off
+the audit is there to show.
 
 ## Reference suites: choosing a starting model before you have data
 
@@ -192,6 +215,7 @@ ethikit run --synthetic n=2000 minority_share=0.15 bias=1.5          # tunable s
 ethikit run --model-param random_forest.max_depth=5                  # any hyperparameter
 ethikit run --estimator xt=sklearn.ensemble.ExtraTreesClassifier     # any estimator class
 ethikit run --model-file mine=model.joblib --no-scale ...            # your own trained model, as-is
+ethikit run --model-file net=model.pt ...                            # a PyTorch nn.Module (or .keras/.h5)
 ethikit run --tool-param robustness.sigma=0.25                       # any tool parameter
 ethikit run --cv 5x3                                                 # repeated k-fold: every score gets a spread
 ethikit list params random_forest | ethikit list tools | ethikit checklist altai

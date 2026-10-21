@@ -306,6 +306,8 @@ def catalogue() -> Dict[str, Any]:
                 for fam, models in reg.items()}
     return {
         "datasets": DATASETS, "synthetic_knobs": SYNTHETIC_KNOBS,
+        "optional_models": {m: hint for m, hint in __import__("ethikit.benchmark.models", fromlist=["x"]).OPTIONAL_MODELS.items()
+                            if m not in CLASSIFIERS.get("deep", {})},
         "classifiers": zoo(CLASSIFIERS), "regressors": zoo(REGRESSORS),
         "tools": tools, "default_weights": DEFAULT_WEIGHTS,
         "principles": [{"id": p.id, "name": p.name, "plain": p.plain,

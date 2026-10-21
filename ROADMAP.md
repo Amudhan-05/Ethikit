@@ -92,7 +92,7 @@ pick is, and re-run the exact same audit from a config file.
 emits a formula, worked steps and an intermediate artefact; mitigation, if present, is
 visibly separate from measurement.
 
-## M5 -- Deep learning  *(HANDOFF Phase 4, scoped down)*
+## M5 -- Deep learning  *(HANDOFF Phase 4, scoped down)*  **[BUILT]**
 
 "Tabular" means data laid out like a spreadsheet: one row per person/loan/case, one column per
 feature (CSV files, database tables). Everything ethikit evaluates today is tabular. Images, text
