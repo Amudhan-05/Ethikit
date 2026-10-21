@@ -202,7 +202,7 @@ footer a{color:var(--ink-dim)}
 
       <div class="subhead">How it works</div>
       <div class="formula">EvalResult(<br>&nbsp;&nbsp;evaluator: str,        <span class="c"># which tool produced this</span><br>&nbsp;&nbsp;principle_id: str,     <span class="c"># which of the 9 principles this speaks to</span><br>&nbsp;&nbsp;target: InspectionTarget, <span class="c"># data / model_internals / predictions / behavior</span><br>&nbsp;&nbsp;metric: str, value: float, higher_is_better: bool,<br>&nbsp;&nbsp;mechanism: str,        <span class="c"># mandatory — this run's actual computation, in words</span><br>&nbsp;&nbsp;details: dict = {}     <span class="c"># free-form extras (per-feature attributions, etc.)</span><br>)</div>
-      <p><code>.as_record(model_name)</code> flattens this into a plain dict for the results DataFrame — every row in every leaderboard, radar chart, and Model Card ultimately comes from this one method.</p>
+      <p><code>.as_record(model_name)</code> flattens this into a plain dict for the results DataFrame — every row in every comparison table, radar chart, and Model Card ultimately comes from this one method.</p>
 
       <div class="subhead">Why this design</div>
       <p><code>mechanism</code> is not optional and has no default — every evaluator is forced to explain itself. This came from a direct architectural requirement: a score with no explanation of how it was computed is a black box, and black boxes are exactly what an ethics-evaluation tool cannot ship. Precomputing every prediction once in <code>EvalContext</code> (rather than letting each evaluator call the model itself) also means the model only ever gets called once per split, which matters once evaluators start doing expensive things like adversarial attacks.</p>
@@ -415,7 +415,7 @@ footer a{color:var(--ink-dim)}
       <span class="file">ethikit/benchmark/models.py</span>
       <div class="subhead">How it works</div>
       <p>A static registry of stock scikit-learn estimators grouped by family — <code>linear</code>, <code>tree_based</code>, <code>instance_based</code>, <code>probabilistic</code>, <code>kernel</code> for classification, plus a mirrored <code>REGRESSORS</code> registry (Phase 2) so the fairness evaluator's regression branch is actually exercised rather than dead code.</p>
-      <div class="why-box"><span class="lbl">Why it works</span><p>Grouping by family, not just by name, is what makes "best model per family" a meaningful question at all — the meta-benchmark and leaderboard both key off <code>family_of()</code> to answer it.</p></div>
+      <div class="why-box"><span class="lbl">Why it works</span><p>Grouping by family, not just by name, is what makes family-level comparison a meaningful question at all — the meta-benchmark and comparison table both key off <code>family_of()</code> to answer it.</p></div>
       <div class="app-box"><span class="lbl">Application angle</span><p>"Which family of model tends to be more ethical, in general" is a genuinely different — and often more actionable — question for a team than "which single model won this one run."</p></div>
     </article>
 
@@ -465,7 +465,7 @@ footer a{color:var(--ink-dim)}
     <div class="part-divider" id="aggregate-head">
       <span class="eyebrow">Part IV</span>
       <h2>Scoring &amp; reporting</h2>
-      <p>How raw per-metric rows become a leaderboard, a radar chart, and a document a human — or a regulator — can actually read.</p>
+      <p>How raw per-metric rows become a comparison table, a radar chart, and a document a human — or a regulator — can actually read.</p>
     </div>
 
     <article class="component" id="aggregate">
@@ -502,7 +502,7 @@ footer a{color:var(--ink-dim)}
       <h3>Streamlit demo</h3>
       <span class="file">demo/app.py</span>
       <div class="subhead">How it works</div>
-      <p>An interactive UI over the exact same <code>run_benchmark()</code> call the CLI examples use — pick model families, run, and get a live Plotly radar chart, leaderboard, and per-model Model Card viewer, plus an expander showing the coverage table.</p>
+      <p>An interactive UI over the exact same <code>run_benchmark()</code> call the CLI examples use — pick model families, run, and get a live Plotly radar chart, comparison table, and per-model Model Card viewer, plus an expander showing the coverage table.</p>
       <div class="why-box"><span class="lbl">Why it works</span><p>Nothing in this file hardcodes evaluator names or metrics — it discovers everything through the same registry every other consumer uses, so a new evaluator shows up in the UI automatically, with zero UI code changes.</p></div>
     </article>
 

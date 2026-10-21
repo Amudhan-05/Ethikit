@@ -1,7 +1,7 @@
 """End-to-end demo: load data -> sweep models -> evaluate -> score -> report.
 
 Run:  python -m examples.run_demo
-It writes `ethikit_report.html` and prints the leaderboard to the console.
+It writes `ethikit_report.html` and prints the comparison table to the console.
 Works offline (synthetic data) and online (real Adult dataset).
 """
 from __future__ import annotations
@@ -32,10 +32,10 @@ def main():
     weights = {"fairness": 0.35, "explainability": 0.2, "safety": 0.2,
                "privacy": 0.15, "inclusiveness": 0.1}
     board = leaderboard(raw, weights=weights)
-    print("=== Leaderboard (fairness-weighted) ===")
+    print("=== Comparison (fairness-weighted order; a selection aid, not a verdict) ===")
     print(board, "\n")
 
-    print("Best model per family (by fairness-weighted score):")
+    print("Top-scoring model per family under these weights (a selection aid, not a verdict):")
     board2 = board.copy()
     board2["family"] = [family_of(m) for m in board2.index]
     for fam, rows in board2.groupby("family"):

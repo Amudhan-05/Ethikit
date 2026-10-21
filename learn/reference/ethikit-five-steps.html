@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cheat sheet — ethikit's five steps</title>
+<script src="../../ethikit/web/theme.js" data-path="learn/reference/five-steps" data-nav="none"></script>
+<link rel="stylesheet" href="../assets/learn.css">
+<style>table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--rule);vertical-align:top}th{font-family:var(--font-mono);color:var(--accent);font-size:.78rem;text-transform:uppercase}
+@media print{.ek-bar{display:none}body{background:#fff;color:#000}}</style></head>
+<body><main>
+<div class="kicker">Reference · print-friendly</div>
+<h1>ethikit in five steps</h1>
+<p><b>What it is:</b> model selection and audit on ethical principles. <b>Not</b> a ranker, not a single ethics score.</p>
+<table>
+<tr><th>#</th><th>Step</th><th>What it does</th><th>Where in the code</th><th>Console / CLI</th></tr>
+<tr><td>1</td><td>Frame</td><td>Data, target, sensitive column, candidate models → one run config</td><td><code>session.prepare()</code></td><td>configure panel · <code>ethikit run</code></td></tr>
+<tr><td>2</td><td>Train &amp; predict</td><td>Fit on train split; predict held-out test; results belong to model + data</td><td><code>run_benchmark()</code></td><td>log: <code>fit</code></td></tr>
+<tr><td>3</td><td>Tools by principle</td><td>Each Evaluator declares principle + inspected part; several tools per principle</td><td><code>evaluators/*</code>, <code>coverage.py</code></td><td>flow graph middle column</td></tr>
+<tr><td>4</td><td>Profile</td><td>Metrics → 0–1 (relative to this run) → per-principle profile → Pareto front; weights optional</td><td><code>scoring/aggregate.py</code></td><td>results tab · <code>--weights</code></td></tr>
+<tr><td>5</td><td>Audit trail</td><td>Formula, worked numbers, intermediate tables, model card, governance checklist</td><td><code>details["trace"]</code>, <code>model_card.py</code>, <code>checklists.py</code></td><td>inspect · model-card · governance tabs</td></tr>
+</table>
+<div class="note"><b>Say it:</b> "ethikit helps you pick a model on your own data, and shows its working so someone else can check the pick."</div>
+<div class="note"><b>Limits to own up to:</b> scores are relative within a run; the cross-dataset suite is generic (not per-domain, no sensitive attribute); governance checklists are evidence, not scores.</div>
+</main></body></html>

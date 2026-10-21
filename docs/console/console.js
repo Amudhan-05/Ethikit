@@ -247,7 +247,7 @@
       });
       w.appendChild(inp); box.appendChild(w);
     });
-    box.appendChild(el("span", { class: "dim small" }, "re-ranks instantly after a run — weights are your value judgement, not the tool's"));
+    box.appendChild(el("span", { class: "dim small" }, "re-orders instantly after a run — weights are your value judgement, not the tool's"));
   }
 
   function renderAdvanced() {
@@ -713,13 +713,13 @@
     }).join("");
     var wtxt = Object.keys(S.weights).filter(function (p) { return S.weights[p] > 0; }).map(function (p) { return p + "=" + S.weights[p]; }).join(", ");
     box.innerHTML =
-      "<h3>leaderboard</h3><p class='prose'>Each column is min-max normalised within this run, so 1 = best <i>among these candidates</i>, not an absolute grade. " +
-      "The weighted column only exists because you supplied weights (" + esc(wtxt) + "); change them in <code>--weights</code> above and the ranking updates without re-running.</p>" +
+      "<h3>comparison</h3><p class='prose'>Each column is min-max normalised within this run, so 1 = best <i>among these candidates</i>, not an absolute grade. " +
+      "The weighted column only exists because you supplied weights (" + esc(wtxt) + "); change them in <code>--weights</code> above and the order updates without re-running. This is a selection aid, not a verdict: open <b>inspect</b> before trusting any number.</p>" +
       "<div class='tscroll'><table class='t'>" + head + rows + "</table></div>" +
       "<div class='res-grid'><div><h3>per-principle radar</h3><div id='radar'></div><div class='legend' id='legend'></div></div>" +
       "<div><h3>pareto front</h3><p class='prose'>Models no other candidate beats on <b>every</b> column at once. Choosing among them is a value judgement — that's what the weights express.</p>" +
       "<div>" + r.pareto.map(function (m) { return "<span class='pill'>" + esc(m) + "</span>"; }).join("") + "</div>" +
-      "<div class='note'>Scores are relative to this dataset and this split. The same model can rank differently on other data — try <code>--synthetic minority_share=0.15</code> or your own CSV, or vary <code>--seed</code>.</div>" +
+      "<div class='note'>Scores are relative to this dataset and this split. The same model can score differently on other data — try <code>--synthetic minority_share=0.15</code> or your own CSV, or vary <code>--seed</code>.</div>" +
       (r.notes || []).map(function (n) { return "<div class='note'>" + esc(n) + "</div>"; }).join("") +
       (S.live ? "<p style='margin-top:12px'><a class='btn' href='api/report/" + esc(r.run_id) + "' target='_blank' rel='noopener'>open aggregate report ↗</a></p>" : "") +
       "</div></div>";

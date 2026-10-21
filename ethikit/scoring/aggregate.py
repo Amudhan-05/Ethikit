@@ -2,7 +2,7 @@
 
 Key design choice: we DO NOT collapse everything into one "ethics score" by
 default. Several fairness criteria are mathematically incompatible (Kleinberg /
-Chouldechova impossibility results), so a single ranking hides real trade-offs.
+Chouldechova impossibility results), so a single ranking hides real trade-offs (ethikit is a selection-and-audit aid, not a ranker).
 Instead we produce:
 
   1. normalize()      -> every metric mapped to [0,1] where 1 = better
