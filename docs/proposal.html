@@ -66,7 +66,7 @@
 <body>
 <div class="wrap">
 
-  <div class="kicker">Project Proposal &middot; v0.1</div>
+  <div class="kicker">Project Proposal &middot; v0.2 &middot; October 2026</div>
   <h1>Ethikit: model selection &amp;<br><span class="accent">audit on ethical principles</span></h1>
   <p class="lede">Give it your dataset and your candidate models. It runs a battery of open-source
   checks and shows each model's profile across fairness, transparency, explainability,
@@ -141,21 +141,24 @@
   <table>
     <thead><tr><th>Principle</th><th>Open-source tools</th><th>What it inspects</th></tr></thead>
     <tbody>
-      <tr><td>Fairness / Inclusiveness</td><td>Fairlearn, AIF360, Giskard</td>
+      <tr><td>Fairness / Inclusiveness</td><td>Fairlearn, AIF360, Giskard; per-group calibration and subgroup accuracy (scikit-learn)</td>
           <td><span class="tag t-data">data</span> <span class="tag t-pred">predictions</span></td></tr>
-      <tr><td>Explainability</td><td>SHAP, LIME, InterpretML</td>
+      <tr><td>Explainability</td><td>SHAP, a surrogate decision tree, permutation importance; Captum integrated gradients for neural networks</td>
           <td><span class="tag t-model">model internals</span> <span class="tag t-pred">predictions</span></td></tr>
-      <tr><td>Transparency / Accountability</td><td>Model Card Toolkit, datasheets</td>
+      <tr><td>Transparency / Accountability</td><td>Model Cards (also as Model Card Toolkit JSON), Datasheets for Datasets, the Deon / EU ALTAI / NIST AI RMF checklists, the audit bundle</td>
           <td><span class="tag t-doc">documentation</span></td></tr>
-      <tr><td>Privacy</td><td>TensorFlow Privacy, Opacus, Presidio</td>
+      <tr><td>Privacy</td><td>Membership- and attribute-inference attacks (implemented natively), Opacus DP-SGD as a privacy-preserving model to compare against</td>
           <td><span class="tag t-data">data</span> <span class="tag t-beh">behavior</span></td></tr>
-      <tr><td>Safety &amp; Robustness</td><td>Giskard, Adversarial Robustness Toolbox</td>
+      <tr><td>Safety &amp; Robustness</td><td>Adversarial Robustness Toolbox, Giskard, Alibi Detect drift, noise robustness, calibration</td>
           <td><span class="tag t-beh">behavior</span></td></tr>
     </tbody>
   </table>
-  <p class="sans muted">Giskard is the standout: one
-  scan covers bias, robustness, and data leakage across every ML model type — and later
-  extends to large language models. It's the natural long-term backbone.</p>
+  <p class="sans muted">Changed since v0.1: TensorFlow Privacy no longer installs on Python
+  3.12, so its membership-inference attack is implemented directly from the paper (Yeom et al.
+  2018), and Opacus is used to train a differentially-private model rather than as a check.
+  LIME, InterpretML and Presidio were not needed: two independent explainers already cover every
+  model, and the data profile covers sensitive columns. Every principle a tool can measure now
+  has at least two tools, and each tool states what it does <i>not</i> measure.</p>
 
   <!-- ============ HOW IT WORKS ============ -->
   <h2>How the orchestrator works</h2>
@@ -224,30 +227,35 @@
     <div class="card"><h3>Compare models fairly</h3><p>Pick the model for a lending or
       hiring task not just on accuracy, but on a full fairness &amp; safety profile — with
       the trade-offs made visible.</p></div>
-    <div class="card"><h3>Set a bar to ship</h3><p>"Only ship models whose fairness gap is
-      below 10%." The check runs automatically, like a test in your pipeline.</p></div>
-    <div class="card"><h3>Answer "which family is best?"</h3><p>Run across many datasets to
-      learn whether tree-based, linear, or other models tend to be more ethical — with
-      statistics to back it.</p></div>
-    <div class="card"><h3>Produce an audit trail</h3><p>Every run emits a shareable report
-      / Model Card — the evidence a reviewer, regulator, or client can read.</p></div>
+    <div class="card"><h3>Set a bar to ship</h3><p>"Only consider models whose parity gap is
+      at most 0.1": a hard requirement on raw metrics. Models that fail it are excluded, with
+      the reason, and the tool says how stable the remaining choice is.</p></div>
+    <div class="card"><h3>Start before you have data</h3><p>Reference suites per domain
+      (census, lending, health, ...) show how each model family behaves across several real
+      datasets: evidence for a starting point, not a winner.</p></div>
+    <div class="card"><h3>Produce an audit trail</h3><p>Every run can be exported as one
+      bundle (config, results, model cards, datasheet, checklist answers, checksums) that a
+      reviewer can re-run to reproduce or challenge every number.</p></div>
   </div>
 
   <!-- ============ PLAN ============ -->
   <h2>Where it's going</h2>
-  <p><b>Now (works today):</b> tabular machine-learning models — classifiers across five
-  families — scored on fairness, explainability, privacy, and safety, on real or synthetic
-  data, with a live demo.</p>
-  <p><b>Next:</b> test across many datasets with proper statistics; add deeper privacy and
-  robustness attacks; generate standards-compliant Model Cards.</p>
-  <p><b>Later:</b> the same framework extends to <b>deep learning and large language
-  models</b> (bias, hallucination, red-teaming) — because every tool sits behind the same
-  plug, the profile and audit trail stay the same; only the checks change.</p>
+  <p><b>Built (v0.2):</b> tabular models across six families including neural networks
+  (scikit-learn and PyTorch, with a differentially-private variant), fourteen tools, cross-validated
+  scores with significance tests, reference suites per domain, hard requirements and a stability
+  check on the choice, a data profile and datasheet, governance checklists with recorded provenance,
+  Model Cards (HTML and JSON) and the reproducible audit bundle — in a local console and CLI that
+  run entirely on your machine.</p>
+  <p><b>Next:</b> the live checks a person has to make (reference-suite downloads; checklist
+  wording against the NIST and EU originals), and more domains as credible multi-dataset suites appear.</p>
+  <p><b>Extended work:</b> large language models, only where the evaluation tools are open source
+  <i>and</i> the model's internals are exposed (open weights, run locally) — the same plug, the
+  same profile and audit trail; only the checks change.</p>
 
   <div class="foot">
     Ethikit &middot; open-source ethical-AI evaluation orchestrator &middot; built on Fairlearn,
     AIF360, SHAP, Giskard and the UNESCO / Microsoft / IBM / Google principle frameworks.
-    Runs on scikit-learn today; deep-learning and LLM support planned.
+    Runs on scikit-learn and PyTorch (tabular data) today; LLM support is extended work.
     <br><a href="index.html">All docs</a> &middot; See also: <a href="field-guide.html" >the demo field guide</a>
     and <a href="understanding.html" >the technical companion</a>.
   </div>

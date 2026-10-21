@@ -128,7 +128,7 @@ measurable difference between them.
 
 **Exit:** a reviewer can receive one bundle and reproduce or challenge every number in it.
 
-## M7 -- Finish and polish
+## M7 -- Finish and polish  **[BUILT -- clean-machine rehearsal (TESTING M7.1) is yours]**
 
 | # | Work | Size |
 |---|---|---|

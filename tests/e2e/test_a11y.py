@@ -54,6 +54,12 @@ def test_tabs_work_from_the_keyboard_with_a_visible_focus_ring(browser, server):
     assert pg.evaluate("document.activeElement.id") == "tabbtn-results"
     assert pg.evaluate("getComputedStyle(document.activeElement).outlineStyle") != "none"
     assert pg.get_attribute("#tab-gov", "aria-labelledby") == "tabbtn-gov"
+    # chips are real checkboxes: focusable, and Space toggles them
+    chip = pg.locator("#models .chip").first
+    before = "on" in (chip.get_attribute("class") or "")
+    chip.locator("input").focus()
+    pg.keyboard.press("Space")
+    assert ("on" in (chip.get_attribute("class") or "")) != before
     # every control in the configure area is reachable with Tab (none has tabindex=-1)
     assert pg.evaluate("document.querySelectorAll('main [tabindex=\"-1\"]:not([role=tab])').length") == 0
     pg.close()

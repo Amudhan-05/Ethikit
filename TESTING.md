@@ -278,14 +278,32 @@ Measured on `--synthetic n=500 noise=2.5 n_features=12 seed=7`, network (256, 25
 | M6.11 | Console **model-card** -> "download .mct.json" | the JSON card for the selected model |
 | M6.12 | Open any model card (or the report, or a datasheet) in **dark** theme and print preview (Ctrl/Cmd+P) | white page, dark text, no title bar or ☀/☾ buttons; every "How each number was computed" section expanded; tables not cut in half; "Save as PDF" works |
 
-## M7 -- Finish and polish
+## M7 -- Finish and polish  *(built)*
+
+Setup for the accessibility tests: `pip install axe-playwright-python` (in requirements-dev.txt).
 
 **Automated**
-- `pytest tests/e2e/test_a11y.py` -- axe-core finds no serious violations in either theme; every control is reachable by keyboard.
-- `pytest tests/test_packaging.py` -- build a wheel, install into a clean venv, `ethikit --help` works and the console serves its static files.
-- `pytest tests/test_docs_links.py` -- no broken internal links across README, docs and ROADMAP.
+
+| Test | What it guarantees |
+|---|---|
+| `pytest tests/e2e/test_a11y.py` | axe-core finds no serious or critical violations on the console (start screen and all seven tabs after a run) or any docs page, in dark **and** light; the tabs work with arrow keys / Home / End with a visible focus ring and roving tabindex; nothing in the console is taken out of the Tab order; with reduced motion no animation runs and the result still arrives |
+| `pytest tests/test_packaging.py` | a wheel is built (uv, `build` or pip) and contains the console files, the theme, the Model Card schema and the `ethikit` entry point, and no tests / docs / learn files; unpacked on its own (isolated mode, no access to this checkout) `ethikit --help` works and the console serves `/`, `console.js`, `theme.css` and `/api/meta` |
+| `pytest tests/test_docs_links.py` | every relative link and `#anchor` in README, ROADMAP, TESTING, THIRD_PARTY_NOTICES and every docs page (and the console's index) resolves; the docs site's link into the README points at a heading that exists |
+| `python -m examples.rehearse_demo` (or `make rehearse`) | every terminal step of the demo script runs and stays inside its time budget (prints a table; exit 1 if not) |
+
+Measured here: the rehearsal takes ~90 s with the core tools, ~3 min with every optional tool
+and PyTorch installed; every step is well inside its budget.
 
 **Manual / visual**
-1. Clean-machine rehearsal: clone, follow only the README, reach a working demo with **no edits**; time it.
-2. Keyboard only: tab through configure -> run -> tabs; **see** a visible focus ring every time; with "reduce motion" on, the flow graph stops animating but still updates.
-3. Run the field guide's demo script start to finish; **see** each cue match the screen and fit the time budget.
+
+| # | Do this | You should see |
+|---|---|---|
+| M7.1 | **Clean-machine rehearsal.** On a machine (or new folder) with only Python 3.12: clone, follow *only* the README's "Run it locally" | a working console at http://127.0.0.1:8765 with no edits to any file; note how long it took |
+| M7.2 | `python -m examples.rehearse_demo` | a table of steps, each `ok` and inside budget, then `ready.` |
+| M7.3 | Keyboard only: reload the console, press Tab repeatedly | a visible green focus ring on every control in turn (data source, chips, weights, run); Space toggles a chip ([ ] ↔ [x]); Enter on "⏎ run" starts the run |
+| M7.4 | Still keyboard only: Tab to the results tabs, then use ← → Home End | the selected tab moves and its panel shows; Tab from a tab goes into the panel, not to the next tab |
+| M7.5 | Turn on "reduce motion" (macOS: Accessibility > Display; Windows: Settings > Accessibility > Visual effects > Animation effects off) and run | the flow graph does not animate (no moving dots, no pulsing) but nodes and results still fill in |
+| M7.6 | Zoom the browser to 200% | everything still readable, no text cut off, the page scrolls vertically only |
+| M7.7 | Open docs/field-guide.html, then run the **demo script** start to finish with a timer | each cue matches what is on screen; about 10 minutes (8.8 without cue 06) |
+| M7.8 | In a fresh venv: `pip install .` then, from another folder, `ethikit serve --open` | the console works; `/docs/` says the docs ship with the source checkout (they are not in the pip package) |
+| M7.9 | `make demo` (macOS / Linux) | the same as `python -m ethikit serve --open` |

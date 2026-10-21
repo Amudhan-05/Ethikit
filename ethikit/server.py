@@ -176,6 +176,14 @@ class Handler(BaseHTTPRequestHandler):
                 md = checklists_mod.to_markdown(cl["checklist"], cl.get("answers"))
                 return self._send(200, md.encode(), "text/markdown; charset=utf-8",
                                   {"Content-Disposition": f'attachment; filename="{cl["checklist"]}.md"'})
+            if (path == "/docs" or path.startswith("/docs/")) and not DOCS.is_dir():
+                msg = ("<!doctype html><html lang='en'><meta charset='utf-8'><title>ethikit docs</title>"
+                       "<body style='font-family:sans-serif;max-width:640px;margin:40px auto'>"
+                       "<h1>Docs are not installed</h1><p>The docs ship with the source checkout, not the "
+                       "pip package. Clone <a href='https://github.com/AmudhanS-05/Ethikit'>the repository</a> "
+                       "and run <code>python -m ethikit serve</code> from it to have them at /docs/.</p>"
+                       "<p><a href='/'>back to the console</a></p></body></html>")
+                return self._send(200, msg.encode(), "text/html; charset=utf-8")
             if path == "/docs" or path == "/docs/":
                 return self._static("index.html", DOCS)
             if path.startswith("/docs/"):

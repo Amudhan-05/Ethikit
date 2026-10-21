@@ -17,3 +17,7 @@ learn/NOTES.md
 
 ethikit_out/
 ethikit_runs/
+build/
+dist/
+ethikit_bundle/
+audit.zip

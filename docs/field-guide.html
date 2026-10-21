@@ -81,6 +81,8 @@ section.block:last-of-type{border-bottom:none}
 }
 .cue-say b{font-style:normal; color:var(--ink); font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; display:block; margin-bottom:4px; font-weight:600}
 .fallback{font-size:13.5px; color:var(--ink-faint); margin-top:8px}
+.cue-cmd{margin-top:8px; font-size:12.5px; overflow-x:auto}
+.cue-cmd code{white-space:pre-wrap; word-break:break-word}
 .fallback b{color:var(--ink-dim); font-weight:600}
 
 /* ---------- diagram ---------- */
@@ -194,70 +196,94 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
   <div class="wrap">
     <div class="section-head">
       <h2>Demo script</h2>
-      <span class="tag green">~8 minutes</span>
+      <span class="tag green">~10 minutes (8 without the optional cue)</span>
     </div>
-    <p class="section-intro">Built for a small live demo with a narrated fallback — every step has something to click <em>and</em> something to say if you'd rather just talk through it. Order matters here, so it's numbered like the run sheet it is. Total run time assumes the console (<code>python -m ethikit serve</code>) and one pre-generated report are already open in tabs before your mentors sit down.</p>
+    <p class="section-intro">Built for a small live demo with a narrated fallback — every step has something to click <em>and</em> something to say if you'd rather just talk through it. Order matters here, so it's numbered like the run sheet it is. Total run time assumes the console (<code>python -m ethikit serve</code>) is already open before your mentors sit down. Rehearse with <code>python -m examples.rehearse_demo</code>: it runs every terminal step and times it against its budget.</p>
 
     <div class="cue-list">
 
-      <div class="cue live">
-        <div class="num">01</div>
+      <div class="cue">
+        <div class="num" aria-hidden="true">01</div>
         <div class="cue-body">
           <h3>Open on the problem, not the tool</h3>
           <div class="cue-meta"><span class="pill time">45 sec</span><span class="pill">framing</span></div>
-          <p>Don't lead with code. Lead with the actual hard problem: you can't compress "is this model ethical" into one number, because some fairness definitions are mathematically incompatible with each other — satisfying one can force you to violate another (Kleinberg / Chouldechova). So ethikit refuses to fake a single score.</p>
-          <div class="cue-say"><b>Say</b>"Ethikit isn't a ranker or a scorer — it's a model-selection and audit tool. It runs real fairness, privacy, and robustness tools against <em>your</em> models on <em>your</em> data, lays out the trade-offs, and leaves an audit trail, instead of pretending there's one 'most ethical' answer."</div>
+          <p>Don't lead with code. Lead with the hard problem: "is this model ethical" does not compress into one number, because some fairness definitions are mathematically incompatible (Kleinberg / Chouldechova). So ethikit refuses to fake a single score.</p>
+          <div class="cue-say"><b>Say</b>"Ethikit is model selection and audit on principles of ethicality, not a model ranker. It runs real fairness, privacy and robustness tools against <em>your</em> candidate models on <em>your</em> data, shows the trade-offs, and leaves an audit trail a reviewer can reproduce."</div>
         </div>
       </div>
 
       <div class="cue live">
-        <div class="num">02</div>
+        <div class="num" aria-hidden="true">02</div>
         <div class="cue-body">
-          <h3>Live: run the console and watch the flow graph</h3>
-          <div class="cue-meta"><span class="pill time">3 min</span><span class="pill">usability</span><span class="pill">live</span></div>
-          <p><code>python -m ethikit serve</code> — tick 3-4 models across families and point out that the command line at the bottom rewrites itself as you click: everything in the UI is a real CLI flag. Press run and narrate the execution graph while it streams: each model is fitted, then every tool lights up under the principle it measures, and results land per principle. When it finishes, change a <code>--weights</code> value and watch the leaderboard re-rank without re-running. Then the radar: each spoke is a principle, each colored polygon is a model, and a bigger polygon is strictly better on that axis. Then point at the leaderboard table and explain the weighted-score column only exists because <em>you</em> supplied weights — the tool never invents them.</p>
-          <div class="cue-say"><b>Say</b>"Every one of these numbers is 0 to 1, always oriented so 1 is best — even where the underlying metric is naturally 'lower is better,' like an error rate. That normalization happens once, in one place, so nothing downstream has to remember which direction is good."</div>
-          <div class="fallback"><b>If the laptop won't cooperate:</b> open the docs site's <a href="console/">console</a> — it replays a recorded real run through the same graph, and the results, inspect and model-card tabs all work. Or open the pre-generated report.</div>
+          <h3>Live: what the data says before any model</h3>
+          <div class="cue-meta"><span class="pill time">1 min</span><span class="pill">data-profile</span><span class="pill">live</span></div>
+          <p>In the console, open the <code>data-profile</code> tab after the run (or run <code>ethikit profile</code> beforehand). Point at the base-rate gap between groups and the proxy screen: the other features predict the sensitive attribute with AUC ≈ 0.71, so simply dropping the column would not remove it.</p>
+          <div class="cue-cmd"><code>python -m ethikit profile</code></div>
+          <div class="cue-say"><b>Say</b>"Before blaming any model: the data itself already differs between groups, and the 'removed' attribute is still recoverable from the others. Any model that fits this data well will tend to reproduce that."</div>
+          <div class="fallback"><b>If the laptop won't cooperate:</b> the docs site's <a href="console/">console</a> replays a recorded run with the same tabs.</div>
         </div>
       </div>
 
       <div class="cue live">
-        <div class="num">03</div>
+        <div class="num" aria-hidden="true">03</div>
         <div class="cue-body">
-          <h3>Live: inspect the maths, then open one Model Card</h3>
-          <div class="cue-meta"><span class="pill time">2 min</span><span class="pill">usability</span><span class="pill">architecture</span></div>
-          <p>First the <code>inspect</code> tab: pick <code>random_forest</code> → <code>membership_inference</code> and show the two histograms — what the attacker sees for training rows vs held-out rows; then <code>aif360</code> to show the 80%-rule ratio worked through with this run's numbers. Then the <code>model-card</code> tab. Scroll straight to <strong>Quantitative Analysis</strong> and point at the <strong>Mechanism</strong> column — this is the single most important thing to show. Every row explains, in one sentence, exactly what computation produced that number: sample sizes, which library ran, which rows were compared. Then scroll to <strong>Tool coverage</strong> and show that a principle like "safety" has three independent tools corroborating it, and each one is one click away from being swapped or added to.</p>
-          <div class="cue-say"><b>Say</b>"No score here is a black box. Every single row traces back to a plain-English sentence of what actually happened — and this card also tells you what <em>other</em> registered tools could have scored this same principle, so picking a tool is a visible choice too, not a hidden default."</div>
+          <h3>Live: run, require, and see how stable the choice is</h3>
+          <div class="cue-meta"><span class="pill time">2.5 min</span><span class="pill">usability</span><span class="pill">decision support</span><span class="pill">live</span></div>
+          <p><code>python -m ethikit serve</code>: tick 3-4 models across families (the command line at the bottom rewrites itself: every control is a real CLI flag). Add a hard requirement such as <code>demographic_parity_diff&lt;=0.15</code>. Press run and narrate the flow graph: each model is fitted, every tool lights up under the principle it measures. In <b>results</b>: models that fail the requirement are struck through with the reason; the Pareto front lists the models nobody beats on every principle; change a weight and the order updates without re-running; "how stable is the order?" says how far the weights would have to move before a different model comes first.</p>
+          <div class="cue-say"><b>Say</b>"Every number is 0 to 1 within this run, 1 = best among these candidates, not an absolute grade. The weighted column only exists because I chose weights, and the tool tells me how fragile that choice is."</div>
+          <div class="fallback"><b>If the laptop won't cooperate:</b> the replay console, or <code>ethikit run --require demographic_parity_diff&lt;=0.15</code> in a terminal.</div>
         </div>
       </div>
 
       <div class="cue">
-        <div class="num">04</div>
+        <div class="num" aria-hidden="true">04</div>
         <div class="cue-body">
-          <h3>Reveal the architecture (works with or without the laptop)</h3>
-          <div class="cue-meta"><span class="pill time">1.5 min</span><span class="pill">architecture / extensibility</span></div>
-          <p>This is the point to zoom out and either show <code>README.md</code>'s "Extending it" snippet or just describe it verbally — it's short enough to say from memory. Adding an entirely new ethics tool is one file: subclass <code>Evaluator</code>, implement <code>evaluate()</code>, call <code>register()</code>. Nothing else changes — the runner, the scoring, the coverage lookup, and every report discover it automatically.</p>
-          <div class="cue-say"><b>Say</b>"This has actually been tested three times over three build phases — I've added a SHAP wrapper, a Giskard scanner, and a real adversarial-attack evaluator, and none of them required touching the pipeline. The registry pattern is the whole extensibility story."</div>
+          <h3>Live: inspect the maths, then one Model Card</h3>
+          <div class="cue-meta"><span class="pill time">2 min</span><span class="pill">transparency</span><span class="pill">live</span></div>
+          <p><b>inspect</b>: pick <code>random_forest</code> → <code>membership_inference</code> for the attacker's member vs non-member histograms, then any tool's "what this does not measure" box. <b>model-card</b>: the Mechanism column (one sentence per number on exactly what was computed), "How each number was computed", and the data-profile and requirement sections. Mention the card also exports as Model Card Toolkit JSON.</p>
+          <div class="cue-say"><b>Say</b>"No score here is a black box: each one traces to the formula, the same formula with this run's numbers, and what it can't see."</div>
         </div>
       </div>
 
       <div class="cue">
-        <div class="num">05</div>
+        <div class="num" aria-hidden="true">05</div>
         <div class="cue-body">
-          <h3>The rigor flex — real attacks, not toy metrics</h3>
+          <h3>Hand it to a reviewer: the audit bundle</h3>
+          <div class="cue-meta"><span class="pill time">1 min</span><span class="pill">accountability</span></div>
+          <p>In <b>results</b> press "export audit bundle (.zip)", or run the command below. Open the README inside: config, every result, metrics.csv, the worked maths, model cards, a datasheet ethikit pre-filled from the profile, checklist answers, library versions, checksums. Then <code>ethikit bundle verify</code> re-runs it and confirms every number reproduces; edit one number in metrics.csv and verify catches it.</p>
+          <div class="cue-cmd"><code>python -m ethikit run --models logistic_regression,random_forest --bundle audit.zip &amp;&amp; python -m ethikit bundle verify audit.zip</code></div>
+          <div class="cue-say"><b>Say</b>"The audit isn't a screenshot. Anyone can re-run it and challenge any number, and a quietly edited number gets caught."</div>
+        </div>
+      </div>
+
+      <div class="cue">
+        <div class="num" aria-hidden="true">06</div>
+        <div class="cue-body">
+          <h3>The rigor flex: real attacks, and a privacy-preserving model</h3>
           <div class="cue-meta"><span class="pill time">1.5 min</span><span class="pill">optional / if time</span></div>
-          <p>If there's time or a pointed question, this is where you show that "ethics evaluation" here means genuinely attacking the model. A hand-off document originally asked for a TensorFlow-Privacy-based membership-inference attack; that package doesn't even install on Python 3.12 anymore, so the actual attack algorithm was implemented natively instead — a real black-box attack (Yeom et al. 2018) that tries to guess which rows a model was trained on. It correctly picked out an overfit random forest as the leakiest model and a plain logistic regression as the safest, on the same data.</p>
-          <div class="cue-say"><b>Say</b>"When a dependency didn't work, the answer wasn't a weaker proxy quietly relabeled as the real thing — it was implementing the published algorithm directly. Same story for the adversarial-robustness and drift-detection evaluators."</div>
+          <p>Membership inference is a real black-box attack (Yeom et al. 2018), implemented natively because the original library no longer installs. With PyTorch installed, train the same network normally and with differential privacy (DP-SGD, Opacus): on small noisy data the attacker's advantage drops from about 0.41 to 0.05 at epsilon = 1, and the DP model's card states the budget. Fairness can get <em>worse</em> under DP, which is exactly the trade-off the audit exists to show.</p>
+          <div class="cue-cmd"><code>python -m ethikit run --family deep --tools performance,membership_inference,captum_ig</code></div>
+          <div class="cue-say"><b>Say</b>"Privacy here isn't a checkbox: it's an attack that succeeds on the overfitted model and fails on the private one, with the cost visible in the other columns."</div>
         </div>
       </div>
 
       <div class="cue">
-        <div class="num">06</div>
+        <div class="num" aria-hidden="true">07</div>
         <div class="cue-body">
-          <h3>Close on what's next</h3>
+          <h3>Reveal the architecture</h3>
+          <div class="cue-meta"><span class="pill time">1 min</span><span class="pill">architecture / extensibility</span></div>
+          <p>Adding a tool is one file: subclass <code>Evaluator</code>, implement <code>evaluate()</code>, give it a formula, a mechanism, its limits and a worked trace, call <code>register()</code>. A contract test enforces all of that for every tool, so the 14th tool (Captum) went in without touching the pipeline.</p>
+          <div class="cue-say"><b>Say</b>"The registry is the extensibility story: fourteen tools from eight libraries, and the pipeline has never had to know about any of them."</div>
+        </div>
+      </div>
+
+      <div class="cue">
+        <div class="num" aria-hidden="true">08</div>
+        <div class="cue-body">
+          <h3>Close on what's open</h3>
           <div class="cue-meta"><span class="pill time">30 sec</span><span class="pill">close</span></div>
-          <p>End on the roadmap, not a summary — it signals this is an active project with a plan, not a finished demo. The next phase extends the same registry to deep-learning and LLM evaluators (Captum, Giskard's LLM scan), which is a genuinely bigger architectural jump since the whole pipeline currently assumes tabular sklearn-style models.</p>
-          <div class="cue-say"><b>Say</b>"Everything so far has been sklearn-shaped. The next open question is what the model context needs to look like once it's a prompt or a tensor instead of a row of numbers."</div>
+          <p>End on what is deliberately not done: an LLM track only when the tools are open source and the model's internals are exposed (open-weight, run locally), and the hand-checks still owed (live dataset downloads; the NIST / ALTAI checklist wording against the originals).</p>
+          <div class="cue-say"><b>Say</b>"The parts a machine can measure are measured, and the parts it can't (accountability, oversight, well-being) are checklists kept beside the numbers, never mixed into them."</div>
         </div>
       </div>
 
@@ -273,7 +299,7 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
 
     <figure class="diagram">
       <div class="diagram-frame">
-        <svg viewBox="0 0 1200 300" role="img" aria-label="Pipeline: Dataset splits into train and test; models are fit and used to build an EvalContext; the Evaluator Registry runs all eight registered evaluators against that context; results become tidy records; Scoring normalizes and ranks them; Reports render the leaderboard, radar chart, and Model Cards. A separate coverage.py module reads the registry's principle tags and mechanisms and feeds them into every report.">
+        <svg viewBox="0 0 1200 300" role="img" aria-label="Pipeline: Dataset splits into train and test; models are fit and used to build an EvalContext; the Evaluator Registry runs every registered evaluator against that context; results become tidy records; Scoring normalizes and ranks them; Reports render the leaderboard, radar chart, and Model Cards. A separate coverage.py module reads the registry's principle tags and mechanisms and feeds them into every report.">
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
@@ -456,7 +482,7 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
 <section class="block" id="evaluators">
   <div class="wrap">
     <div class="section-head">
-      <h2>The 8 evaluators</h2>
+      <h2>The 14 tools</h2>
       <span class="tag red">3 marked <span class="mono">real attack</span> run genuine offensive techniques, not proxies</span>
     </div>
     <p class="section-intro">Every card below is a registered <code>Evaluator</code> subclass. Each one tags its output with a principle, an <code>InspectionTarget</code> (what part of the model/data it actually looks at), and a <code>mechanism</code> string explaining how it decides — shown here as the tool's own general description.</p>
@@ -553,6 +579,72 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
         </dl>
       </div>
 
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>AIF360</h3><span class="file">evaluators/aif360_eval.py — principles: fairness, inclusiveness</span></div>
+          <div class="badges"><span class="pill">predictions</span></div>
+        </div>
+        <p class="mech">IBM's AI Fairness 360 metrics on the test predictions: disparate impact (the 80% rule), equal-opportunity and average-odds differences, and the Theil index (inequality of individual benefit).</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>disparate_impact_gap</code> = |1 − disparate impact|: 0 is parity, above 0.2 fails the four-fifths rule. <code>theil_index</code> of 0 means benefit is spread evenly across individuals.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Calibration</h3><span class="file">evaluators/calibration.py — principles: safety, fairness</span></div>
+          <div class="badges"><span class="pill">predictions</span></div>
+        </div>
+        <p class="mech">Expected calibration error over probability bins, overall and per group: does "70% likely" mean 70%, and does it mean the same for every group?</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>expected_calibration_error</code> near 0 = trustworthy probabilities. <code>calibration_gap_between_groups</code> near 0 = the same score means the same thing for everyone.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Subgroup performance</h3><span class="file">evaluators/subgroup.py — principles: inclusiveness, fairness</span></div>
+          <div class="badges"><span class="pill">predictions</span></div>
+        </div>
+        <p class="mech">Accuracy inside every group of the sensitive attribute: the worst group, and the gap between best and worst.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>worst_group_accuracy</code> is the floor someone actually experiences; <code>accuracy_gap_between_groups</code> near 0 = nobody is served markedly worse.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Permutation importance</h3><span class="file">evaluators/permutation.py — principles: explainability, transparency</span></div>
+          <div class="badges"><span class="pill">model_internals</span><span class="pill">predictions</span></div>
+        </div>
+        <p class="mech">Shuffles one feature at a time and measures the score drop: how concentrated the model's reliance is, and how much it leans on the sensitive attribute itself.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>importance_concentration</code> high = a few features drive everything (easier to explain). <code>sensitive_feature_reliance</code> near 0 = the model barely uses the sensitive column directly (proxies are the data profile's job).</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard real">
+        <div class="eh">
+          <div><h3>Attribute inference <span class="tag red" style="margin-left:8px">real attack</span></h3><span class="file">evaluators/attribute_inference.py — principle: privacy</span></div>
+          <div class="badges"><span class="pill">behavior</span></div>
+        </div>
+        <p class="mech">Two attackers try to recover each person's sensitive attribute: one from the other features alone, one also seeing the model's output. The difference is what the model itself leaks.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>attribute_inference_gain</code> of 0 = the model's outputs add nothing to what the features already reveal.</dd>
+        </dl>
+      </div>
+
+      <div class="evalcard">
+        <div class="eh">
+          <div><h3>Captum integrated gradients</h3><span class="file">evaluators/captum_ig.py — principle: explainability (PyTorch models)</span></div>
+          <div class="badges"><span class="pill">model_internals</span></div>
+        </div>
+        <p class="mech">Gradients of the network itself, integrated from a baseline to each input (Sundararajan et al. 2017), with the completeness check that the attributions add up to the change in prediction.</p>
+        <dl class="evrow">
+          <dt>Read a value</dt><dd><code>ig_completeness_error</code> near 0 = the explanation accounts for the prediction. <code>ig_concentration</code> = share carried by the top three features.</dd>
+        </dl>
+      </div>
+
     </div>
   </div>
 </section>
@@ -582,6 +674,8 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
         <tr><th>Claim</th><th>Evidence</th><th>Where it lives</th></tr>
         <tr><td>Rankings are statistically real, not noise</td><td>Friedman test on accuracy across 15 CV folds: <code>p = 1.65e-11</code> — average ranks from <code>logistic_regression</code> (best, 1.33) to <code>decision_tree</code> (worst, 6.13), with a critical-difference diagram showing which pairs actually differ</td><td><code>examples/run_phase2_demo.py</code></td></tr>
         <tr><td>Family tendencies aren't a one-dataset anecdote</td><td>480 rows across 10 generic PMLB datasets (no sensitive attribute, not per-domain); per-family means across all of them, not one lucky split</td><td><code>ethikit.benchmark.meta</code></td></tr>
+        <tr><td>Differential privacy measurably protects</td><td>Same network, same small noisy data: membership-inference advantage 0.41 trained normally vs 0.05 with DP-SGD at epsilon = 1 (test accuracy 0.62 vs 0.67)</td><td><code>tests/test_deep_torch.py</code>, TESTING.md M5</td></tr>
+        <tr><td>Every number can be reproduced</td><td><code>ethikit bundle verify</code> re-runs a bundle's config and compares every metric exactly; an edited number fails both the checksum and the re-run</td><td><code>tests/test_bundle.py</code></td></tr>
         <tr><td>Privacy risk is a real, differentiated signal</td><td>Membership-inference advantage ranged 0.000 (logistic regression) → 0.325 (unconstrained random forest) on identical data — the attack tracks actual overfitting, not noise</td><td><code>examples/run_phase3_demo.py</code></td></tr>
       </table>
     </div>
@@ -592,7 +686,7 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
 <section class="block" id="roadmap">
   <div class="wrap">
     <div class="section-head"><h2>What's next</h2></div>
-    <p class="section-intro"><strong>Phase 4 — deep learning &amp; LLMs</strong> is the only item left on the original roadmap, and it's a bigger jump than phases 1-3: every evaluator so far assumes a sklearn-style tabular model with <code>.fit()</code>/<code>.predict()</code> over numpy arrays. Extending to DL (Captum, a PyTorch/TF adapter) or LLMs (DeepEval/DeepTeam, or Giskard's own LLM scan — already a dependency here) means deciding whether <code>EvalContext</code> grows a non-tabular variant or gets a parallel type entirely. Good, deliberately open question for mentor input.</p>
+    <p class="section-intro">Milestones M1-M7 are built (see <code>ROADMAP.md</code>): trustworthy tests and CI, reference suites per domain, decision support (requirements, stability, run history, data profile), tool depth (14 tools, every principle with at least two), deep learning on tabular data with a differentially-private variant, reporting and governance (Model Card Toolkit JSON, datasheets, the audit bundle, checklist provenance, print) and accessibility and packaging. Open: an <strong>LLM track</strong>, only if the tools are open source and the model's internals are exposed (open-weight, run locally), and two checks a person has to do: the live reference-suite downloads, and the NIST AI RMF / EU ALTAI / Datasheets checklist wording against the originals.</p>
   </div>
 </section>
 
@@ -601,13 +695,14 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
   <div class="wrap">
     <div class="section-head"><h2>Commands, for the pre-demo checklist</h2></div>
     <div class="cmdlist">
-      <div class="cmdrow"><code>pip install -r requirements.txt</code><span>or <code>pip install -e ".[full,phase2,phase3]"</code> — run once, well before the room fills up</span></div>
-      <div class="cmdrow"><code>python -m ethikit serve --open</code><span>the live console — open this tab first and leave it running</span></div>
-      <div class="cmdrow"><code>python -m ethikit run --models logistic_regression,random_forest --trace</code><span>the same run in the terminal, with every formula worked through</span></div>
+      <div class="cmdrow"><code>pip install -r requirements.txt</code><span>once, well before the room fills up (Python 3.12). Deep learning: <code>pip install torch --index-url https://download.pytorch.org/whl/cpu &amp;&amp; pip install captum opacus</code></span></div>
+      <div class="cmdrow"><code>python -m examples.rehearse_demo</code><span>runs every terminal step of the script and times it against its budget</span></div>
+      <div class="cmdrow"><code>python -m ethikit serve --open</code><span>the live console (docs at /docs/) — open it first and leave it running</span></div>
+      <div class="cmdrow"><code>python -m ethikit profile</code><span>what the data says before any model</span></div>
+      <div class="cmdrow"><code>python -m ethikit run --models logistic_regression,random_forest --require demographic_parity_diff&lt;=0.15 --trace</code><span>the same run in the terminal, with every formula worked through</span></div>
+      <div class="cmdrow"><code>python -m ethikit run --bundle audit.zip &amp;&amp; python -m ethikit bundle verify audit.zip</code><span>the audit bundle, and proof that it reproduces</span></div>
       <div class="cmdrow"><code>python -m ethikit checklist deon --out answers.json</code><span>governance checklist template; fill it, then <code>ethikit run --checklist answers.json</code></span></div>
-      <div class="cmdrow"><code>python -m examples.run_demo</code><span>generates <code>ethikit_report.html</code> + all Model Cards — your static fallback, run this beforehand too</span></div>
-      <div class="cmdrow"><code>python -m examples.run_phase2_demo</code><span>CV, significance testing, meta-benchmark — the rigor numbers above</span></div>
-      <div class="cmdrow"><code>python -m examples.run_phase3_demo</code><span>the three real attacks, printed with their mechanism text inline</span></div>
+      <div class="cmdrow"><code>python -m ethikit datasheet</code><span>the dataset's datasheet, pre-filled; open questions in <code>datasheet_answers.json</code></span></div>
     </div>
   </div>
 </section>
