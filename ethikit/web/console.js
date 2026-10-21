@@ -1154,7 +1154,9 @@
     box.appendChild(bar);
     box.appendChild(el("p", { class: "prose" }, "Accountability, human oversight and well-being can't be measured from a model and a dataset — no tool can. " +
       "What a team <i>can</i> do is answer a recognised checklist and keep the answers next to the metrics. Source: <a href='" + esc(c.url) + "' target='_blank' rel='noopener'>" +
-      esc(c.source) + "</a>. " + esc(c.scope) + " Items are ethikit's condensed paraphrase — use the original for a formal audit."));
+      esc(c.source) + "</a>. " + esc(c.scope) + " " + esc(c.provenance.line) +
+      (c.provenance.drift_notes.length ? " <details class='small'><summary>provenance notes</summary>" +
+        c.provenance.drift_notes.map(function (n) { return "<p>" + esc(n) + "</p>"; }).join("") + "</details>" : "")));
     var grid = el("div", { class: "gov-grid" });
     var left = el("div"), right = el("div", { class: "sticky" });
     var sec = null;
@@ -1162,7 +1164,8 @@
       if (it.section !== sec) { sec = it.section; left.appendChild(el("div", { class: "gsec" }, esc(sec))); }
       var a = S.answers[it.id] || {};
       var row = el("div", { class: "gitem" }, "<span class='id'>" + esc(it.id) + "</span>");
-      var body = el("div", null, "<div class='q'>" + esc(it.text) + "</div><div class='tags'>→ " + it.principles.map(esc).join(", ") + "</div>");
+      var body = el("div", null, "<div class='q'>" + esc(it.text) + "</div><div class='tags'>→ " + it.principles.map(esc).join(", ") +
+        (it.ref && it.ref !== it.section ? " · original: " + esc(it.ref) : "") + "</div>");
       var ctl = el("div", { class: "ctl" });
       ["yes", "partial", "no", "n/a"].forEach(function (v) {
         var lab = el("label", { class: v.replace("/", "") }, "");
@@ -1225,7 +1228,7 @@
     return out;
   }
   function toMarkdown(c) {
-    var lines = ["# " + c.name, "", "Source: " + c.source + " -- " + c.url, "", "_Condensed, paraphrased items via ethikit; use the original for a formal audit._"];
+    var lines = ["# " + c.name, "", "Source: " + c.source + " -- " + c.url, "", "_" + c.provenance.line + "_"];
     var sec = null;
     c.items.forEach(function (it) {
       if (it.section !== sec) { sec = it.section; lines.push("", "## " + sec, ""); }

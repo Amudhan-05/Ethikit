@@ -234,12 +234,13 @@ def _checklist_html(checklist: Optional[dict]) -> str:
         a = answers.get(i.id) or {}
         ans = a.get("answer") or "unanswered"
         cls = {"yes": "", "partial": "gov", "no": "bad"}.get(ans, "other")
-        irows += (f"<tr><td><code>{esc(i.id)}</code></td><td>{esc(i.text)}</td>"
+        ref = f"<div class='small muted'>original: {esc(i.ref)}</div>" if i.ref and i.ref != i.section else ""
+        irows += (f"<tr><td><code>{esc(i.id)}</code></td><td>{esc(i.text)}{ref}</td>"
                   f"<td><span class='pill {cls}'>{esc(ans)}</span></td>"
                   f"<td class='mech'>{esc(a.get('note') or '')}</td></tr>")
     return (f"<p>Answered against <b>{esc(c.name)}</b> ({esc(c.source)}, "
-            f"<a href='{esc(c.url)}'>source</a>). Items are ethikit's condensed paraphrase; "
-            f"use the original for a formal audit. This is <i>process</i> evidence about the "
+            f"<a href='{esc(c.url)}'>source</a>). {esc(checklists_mod.provenance_line(c))} "
+            f"This is <i>process</i> evidence about the "
             f"team and system, never mixed into the model scores above.</p>"
             f"<table><tr><th>Principle</th><th>Evidence score (yes=1, partial=0.5)</th>"
             f"<th>Answered / applicable</th></tr>{srows}</table>"

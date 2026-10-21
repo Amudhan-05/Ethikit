@@ -35,4 +35,5 @@ testpaths = ["tests"]
 markers = [
     "e2e: browser end-to-end tests (need playwright + chromium); run with `pytest -m e2e`",
     "slow: takes more than a few seconds",
+    "network: needs internet access; skips itself when offline",
 ]
