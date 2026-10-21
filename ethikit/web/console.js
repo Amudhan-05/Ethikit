@@ -22,6 +22,7 @@
     result: null, running: false,
     checklistId: "deon", answers: {},
     mode: "mine", domain: "census", suite: null, suiteDatasets: {},
+    requirements: [], profile: null, historySel: [],
   };
 
   function esc(s) {
@@ -107,6 +108,14 @@
       $("#copy").textContent = "copied"; setTimeout(function () { $("#copy").textContent = "copy"; }, 1200);
     });
     $("#run").addEventListener("click", run);
+    var dl = $("#req-metrics");
+    REQ_METRICS.forEach(function (m) { dl.appendChild(el("option", { value: m + "<=" })); });
+    $("#req-add").addEventListener("click", addRequirement);
+    $("#req-input").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addRequirement(); } });
+    $("#export-config").addEventListener("click", function () {
+      download("ethikit_config.json", JSON.stringify(exportableConfig(), null, 2), "application/json");
+    });
+    $("#import-config").addEventListener("change", importConfig);
     document.querySelectorAll("input[name=mode]").forEach(function (r) {
       r.addEventListener("change", function () { if (r.checked) setMode(r.value); });
     });
@@ -130,11 +139,71 @@
   }
 
   function applyConfig(cfg) {
-    S.source = cfg.data.source; $("#data-source").value = S.source;
-    S.models = new Set(cfg.models.map(function (m) { return m.name; }));
+    var src = (cfg.data || {}).source || "synthetic";
+    if (src === "upload" || src === "csv") {
+      log("skip", "this config used your own CSV" + (cfg.data.path ? " (" + cfg.data.path + ")" : "") +
+          ": choose the file again under --data, then run. Everything else was restored.");
+      src = "csv";
+    }
+    S.source = src; $("#data-source").value = S.source;
+    if (src === "synthetic_custom" && cfg.data.synthetic) S.synth = Object.assign({}, S.meta.synthetic_knobs, cfg.data.synthetic);
+    var models = cfg.models || [];
+    S.models = new Set(models.filter(function (m) { return !m.estimator && !m.file && !m.upload_model_id; }).map(function (m) { return m.name; }));
+    S.modelParams = {};
+    models.forEach(function (m) { if (m.params && Object.keys(m.params).length) S.modelParams[m.name] = Object.assign({}, m.params); });
+    S.estimators = models.filter(function (m) { return m.estimator; }).map(function (m) { return { name: m.name, path: m.estimator }; });
     if (cfg.tools) S.tools = new Set(cfg.tools);
-    S.weights = Object.assign({}, cfg.weights);
-    renderData(); renderModels(); renderTools(); renderWeights(); update();
+    S.toolParams = JSON.parse(JSON.stringify(cfg.tool_params || {}));
+    if (cfg.weights) S.weights = Object.assign({}, cfg.weights);
+    var sp = cfg.split || {};
+    $("#seed").value = sp.seed || 0; $("#test-size").value = sp.test_size || 0.3;
+    $("#no-scale").checked = sp.scale === false; $("#cv").value = sp.cv ? sp.cv[0] + "x" + sp.cv[1] : "";
+    S.requirements = (cfg.requirements || []).map(String);
+    renderData(); renderModels(); renderEstimators(); renderTools(); renderWeights(); renderRequirements(); update();
+  }
+
+  var REQ_METRICS = ["demographic_parity_diff", "equalized_odds_diff", "min_group_selection_rate", "disparate_impact_gap",
+    "abs_equal_opportunity_diff", "abs_average_odds_diff", "theil_index", "membership_inference_advantage",
+    "membership_inference_auc", "perturbation_stability", "adversarial_robustness", "surrogate_fidelity",
+    "accuracy", "f1", "roc_auc"];
+
+  function addRequirement() {
+    var v = $("#req-input").value.trim();
+    if (!/^([\w-]+\.)?[\w-]+\s*(<=|>=|<|>)\s*-?\d+(\.\d*)?$/.test(v)) {
+      $("#req-err").textContent = "write it like demographic_parity_diff<=0.1"; return;
+    }
+    $("#req-err").textContent = ""; $("#req-input").value = "";
+    S.requirements.push(v.replace(/\s+/g, "")); renderRequirements(); update();
+  }
+  function renderRequirements() {
+    var box = $("#req-list"); box.innerHTML = "";
+    S.requirements.forEach(function (r, i) {
+      var c = el("span", { class: "pill gold" }, esc(r) + " ");
+      var x = el("button", { class: "btn", type: "button", "aria-label": "remove requirement " + r }, "×");
+      x.style.padding = "0 5px";
+      x.addEventListener("click", function () { S.requirements.splice(i, 1); renderRequirements(); update(); });
+      c.appendChild(x); box.appendChild(c);
+    });
+  }
+  function exportableConfig() {
+    var c = config();
+    if (c.data.source === "upload") {
+      c.data = { source: "csv", path: (S.upload ? S.upload.name : "your_data") + ".csv", target: c.data.target,
+                 sensitive: c.data.sensitive, exclude_sensitive: c.data.exclude_sensitive,
+                 positive_label: c.data.positive_label, sensitive_threshold: c.data.sensitive_threshold };
+    }
+    c.models = c.models.filter(function (m) { return !m.upload_model_id; });
+    return c;
+  }
+  function importConfig(ev) {
+    var f = ev.target.files[0]; if (!f) return;
+    f.text().then(function (t) {
+      var d = JSON.parse(t); var cfg = d.config || d;
+      if (!cfg.data) throw new Error("not an ethikit config (no 'data' section)");
+      document.querySelector("input[name=mode][value=mine]").checked = true; setMode("mine");
+      applyConfig(cfg); log("ok", "config loaded from " + f.name);
+    }).catch(function (e) { log("err", "import failed: " + e.message); });
+    ev.target.value = "";
   }
 
   // ------------------------------------------------------------------ configure
@@ -327,6 +396,7 @@
                scale: !$("#no-scale").checked, cv: parseCv($("#cv").value) },
       models: models, tools: Array.from(S.tools), tool_params: tp, weights: S.weights,
       checklist: Object.keys(S.answers).length ? { checklist: S.checklistId, answers: S.answers } : null,
+      requirements: S.requirements.slice(),
     };
   }
 
@@ -387,6 +457,7 @@
     if (!c.split.scale) parts.push("--no-scale");
     if (c.split.cv) parts.push("--cv " + c.split.cv[0] + "x" + c.split.cv[1]);
     if (c.checklist) parts.push("--checklist " + S.checklistId + "_answers.json");
+    S.requirements.forEach(function (r) { parts.push('--require "' + r + '"'); });
     return parts.join(" \\\n    ");
   }
   function quote(v) { return /[\s'"(),]/.test(v) ? '"' + String(v).replace(/"/g, '\\"') + '"' : v; }
@@ -462,6 +533,10 @@
   function onEvent(e) {
     switch (e.type) {
       case "prepare": log("run", "preparing data + models (run " + e.run_id + ")"); break;
+      case "profile":
+        S.profile = e; renderProfile();
+        (e.warnings || []).forEach(function (w) { log("skip", "data  ! " + w); });
+        break;
       case "note": log("skip", "note: " + e.message); break;
       case "run_start":
         G = buildGraph(e);
@@ -495,7 +570,7 @@
         S.result = e;
         $("#run-label").textContent = e.dataset + " · " + Object.keys(e.objective).length + " models";
         G && G.final(e);
-        renderResults(); renderInspect(); renderCardTab();
+        renderResults(); renderInspect(); renderCardTab(); if (S.live) renderHistory();
         log("ok", "pareto front: " + e.pareto.join(", "));
         break;
     }
@@ -735,7 +810,10 @@
     models.forEach(function (m) {
       var s = 0; for (var p in w) s += (r.objective[m][p] || 0) * w[p] / (wsum || 1); score[m] = s;
     });
-    models.sort(function (a, b) { return score[b] - score[a]; });
+    var req = r.requirements;
+    function ok(m) { return !req || (req.by_model[m] && req.by_model[m].passes); }
+    // models that meet your requirements come first; within each group, by weighted score
+    models.sort(function (a, b) { return (ok(b) - ok(a)) || (score[b] - score[a]); });
     return { models: models, cols: cols, score: score, wsum: wsum };
   }
   function colourIndex(m) { return Object.keys(S.result.objective).indexOf(m) % 10; }
@@ -744,12 +822,14 @@
     var r = S.result; var sc = scored();
     var box = $("#tab-results"); box.innerHTML = "";
     var head = "<tr><th>model</th><th>family</th>" + sc.cols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") +
-      "<th>weighted</th><th>pareto</th></tr>";
+      "<th>weighted</th><th>pareto</th>" + (r.requirements ? "<th>requirements</th>" : "") + "</tr>";
     var rows = sc.models.map(function (m) {
-      return "<tr><td><span class='sw s" + colourIndex(m) + "'></span> " + esc(m) + "</td><td class='l dim'>" + esc(r.families[m] || "custom") + "</td>" +
+      var failing = r.requirements && !r.requirements.by_model[m].passes;
+      return "<tr" + (failing ? " class='excluded' title='fails a requirement you set'" : "") + "><td><span class='sw s" + colourIndex(m) + "'></span> " + esc(m) + "</td><td class='l dim'>" + esc(r.families[m] || "custom") + "</td>" +
         sc.cols.map(function (c) { var v = r.objective[m][c]; var sd = r.objective_std && r.objective_std[m] ? r.objective_std[m][c] : null;
           return "<td class='heat' style='--h:" + (v || 0) + "'>" + fmt(v) + (sd != null ? " <span class='dim'>±" + sd.toFixed(2) + "</span>" : "") + "</td>"; }).join("") +
-        "<td><b>" + fmt(sc.score[m]) + "</b></td><td>" + (r.pareto.indexOf(m) >= 0 ? "<span class='pill'>front</span>" : "<span class='dim'>–</span>") + "</td></tr>";
+        "<td><b>" + fmt(sc.score[m]) + "</b></td><td>" + (r.pareto.indexOf(m) >= 0 ? "<span class='pill'>front</span>" : "<span class='dim'>–</span>") + "</td>" +
+        (r.requirements ? "<td>" + (r.requirements.by_model[m].passes ? "<span class='pill'>meets</span>" : "<span class='pill red'>fails</span>") + "</td>" : "") + "</tr>";
     }).join("");
     var wtxt = Object.keys(S.weights).filter(function (p) { return S.weights[p] > 0; }).map(function (p) { return p + "=" + S.weights[p]; }).join(", ");
     box.innerHTML =
@@ -761,9 +841,77 @@
       "<div>" + r.pareto.map(function (m) { return "<span class='pill'>" + esc(m) + "</span>"; }).join("") + "</div>" +
       "<div class='note'>Scores are relative to this dataset and this split. The same model can score differently on other data — try <code>--synthetic minority_share=0.15</code> or your own CSV, or vary <code>--seed</code>.</div>" +
       (r.notes || []).map(function (n) { return "<div class='note'>" + esc(n) + "</div>"; }).join("") +
+      requirementsHtml(r) + stabilityHtml(r) +
       (S.live ? "<p style='margin-top:12px'><a class='btn' href='api/report/" + esc(r.run_id) + "' target='_blank' rel='noopener'>open aggregate report ↗</a></p>" : "") +
       "</div></div>";
     radar($("#radar"), sc);
+  }
+
+  function requirementsHtml(r) {
+    var q = r.requirements; if (!q) return "";
+    var failing = Object.keys(q.by_model).filter(function (m) { return !q.by_model[m].passes; });
+    return "<h3 style='margin-top:14px'>requirements</h3><p class='prose'>" + q.list.map(function (t) { return "<code>" + esc(t) + "</code>"; }).join(" · ") +
+      " — checked on raw values. Feasible: " + (q.feasible.length ? q.feasible.map(function (m) { return "<span class='pill'>" + esc(m) + "</span>"; }).join("") : "<b class='err'>none — relax a requirement</b>") + "</p>" +
+      (failing.length ? "<div class='note'><b>excluded, and why</b>" + failing.map(function (m) {
+        return "<div>" + esc(m) + ": " + q.by_model[m].results.filter(function (x) { return !x.passes; }).map(function (x) { return esc(x.requirement) + " — " + esc(x.reason); }).join("; ") + "</div>"; }).join("") + "</div>" : "");
+  }
+  function stabilityHtml(r) {
+    var s = r.stability; if (!s) return "";
+    if (!s.available) return "<h3 style='margin-top:14px'>how stable is the order?</h3><p class='dim small'>" + esc(s.reason) + "</p>";
+    return "<h3 style='margin-top:14px'>how stable is the order?</h3><p class='prose'>Under your weights <b>" + esc(s.first) + "</b> comes first" +
+      (r.requirements ? " among the feasible models" : "") + "; <b>" + Math.round(100 * s.nearby_weights_keep_first) + "%</b> of nearby weight settings keep it first" +
+      (Object.keys(s.main_rivals).length ? " (otherwise " + Object.keys(s.main_rivals).map(esc).join(", ") + ")" : "") + ".</p>" +
+      "<ul class='prose small'>" + Object.keys(s.per_principle).map(function (p) { return "<li>" + esc(s.per_principle[p].sentence) + "</li>"; }).join("") + "</ul>" +
+      "<p class='dim small'>Note: these weights re-order without re-running; the stability above was computed for the weights you ran with.</p>";
+  }
+
+  function renderProfile() {
+    var p = S.profile; var box = $("#tab-data"); if (!p) return;
+    var g = (p.groups || []).map(function (x) { return "<tr><td>" + esc(x.group) + "</td><td>" + x.n + "</td><td>" + fmt(x.share) + "</td><td>" + fmt(x.base_rate != null ? x.base_rate : x.mean_target) + "</td></tr>"; }).join("");
+    var px = p.proxy || {};
+    var top = (px.top_features || []).map(function (f) { return "<tr><td>" + esc(f.feature) + "</td><td>" + fmt(f.mutual_information) + "</td></tr>"; }).join("");
+    var miss = (p.missing || []).map(function (m) { return "<tr><td>" + esc(m.column) + "</td><td>" + (100 * m.share_missing).toFixed(1) + "%</td></tr>"; }).join("");
+    box.innerHTML = "<h3>what the data says, before any model</h3><p class='prose'>" + p.n_rows + " rows · " + p.n_features + " features · sensitive attribute <b>" + esc(p.sensitive || "none") + "</b>" +
+      (p.positive_rate != null ? " · positive rate " + fmt(p.positive_rate) : "") + "</p>" +
+      ((p.warnings || []).length ? "<div class='note'>" + p.warnings.map(function (w) { return "<div>! " + esc(w) + "</div>"; }).join("") + "</div>" : "<p class='ok small'>no data-level warnings</p>") +
+      "<div class='ins-grid' style='margin-top:12px'><div><h3>groups</h3><div class='tscroll'><table class='t'><tr><th>group</th><th>rows</th><th>share</th><th>base rate</th></tr>" + g + "</table></div></div>" +
+      "<div><h3>proxy screen</h3><p class='prose small'>" + (px.auc != null ? "Other features predict the sensitive attribute with <b>AUC " + fmt(px.auc) + "</b> (0.5 = no information). " + esc(px.method || "") : esc(px.reason || "not available")) + "</p>" +
+      (top ? "<div class='tscroll'><table class='t'><tr><th>feature</th><th>mutual information</th></tr>" + top + "</table></div>" : "") +
+      (miss ? "<h3 style='margin-top:12px'>missing before imputation</h3><div class='tscroll'><table class='t'><tr><th>column</th><th>missing</th></tr>" + miss + "</table></div>" : "") + "</div></div>";
+  }
+
+  function renderHistory() {
+    var box = $("#tab-history");
+    if (!S.live) { box.innerHTML = "<div class='empty'>run history is kept by the local console (python -m ethikit serve)</div>"; return; }
+    fetch("api/runs").then(function (r) { return r.json(); }).then(function (d) {
+      var runs = d.runs || []; S.historySel = [];
+      box.innerHTML = "<h3>saved runs</h3><p class='prose small'>Every run is saved locally under <code>ethikit_runs/</code>. Tick two to compare, or load one's config to re-run it exactly.</p>" +
+        (runs.length ? "<div class='tscroll'><table class='t'><tr><th></th><th>run</th><th>dataset</th><th>models</th><th>cv</th><th></th></tr>" + runs.map(function (x) {
+          return "<tr><td><input type='checkbox' class='hsel' value='" + esc(x.run_id) + "' aria-label='select " + esc(x.run_id) + "'></td><td>" + esc(x.run_id) + "</td><td class='l'>" + esc(x.dataset) + "</td><td class='l'>" + esc((x.models || []).join(", ")) + "</td><td>" + (x.cv ? x.cv.join("x") : "–") + "</td><td><button class='btn hload' data-id='" + esc(x.run_id) + "' type='button'>load config</button></td></tr>"; }).join("") + "</table></div>" +
+          "<p style='margin-top:10px'><button class='btn primary' id='hdiff' type='button' disabled>compare selected</button></p><div id='hdiff-out'></div>" : "<div class='empty'>no saved runs yet</div>");
+      box.querySelectorAll(".hsel").forEach(function (c) { c.addEventListener("change", function () {
+        S.historySel = Array.from(box.querySelectorAll(".hsel:checked")).map(function (x) { return x.value; });
+        var b = $("#hdiff"); if (b) b.disabled = S.historySel.length !== 2; }); });
+      box.querySelectorAll(".hload").forEach(function (b) { b.addEventListener("click", function () {
+        fetch("api/runs/" + encodeURIComponent(b.dataset.id)).then(function (r) { return r.json(); }).then(function (run) {
+          document.querySelector("input[name=mode][value=mine]").checked = true; setMode("mine");
+          applyConfig(run.config); window.scrollTo({ top: 0, behavior: "smooth" }); log("ok", "config of " + b.dataset.id + " loaded — press run to reproduce it");
+        }); }); });
+      var hd = $("#hdiff"); if (hd) hd.addEventListener("click", function () {
+        fetch("api/runs-diff?a=" + encodeURIComponent(S.historySel[1]) + "&b=" + encodeURIComponent(S.historySel[0])).then(function (r) { return r.json(); }).then(renderDiff); });
+    }).catch(function () { box.innerHTML = "<div class='empty'>could not load run history</div>"; });
+  }
+  function renderDiff(d) {
+    var out = $("#hdiff-out");
+    if (d.error) { out.innerHTML = "<div class='note'>" + esc(d.error) + "</div>"; return; }
+    if (d.identical) { out.innerHTML = "<p class='ok'>identical: same config, same scores, same metrics</p>"; return; }
+    function tbl(rows, cols) { return "<div class='tscroll'><table class='t'><tr>" + cols.map(function (c) { return "<th>" + c + "</th>"; }).join("") + "</tr>" +
+      rows.map(function (r) { return "<tr>" + cols.map(function (c) { var v = r[c]; return "<td" + (c === "delta" && v ? " class='" + (v > 0 ? "ok" : "err") + "'" : "") + ">" + esc(v == null ? "–" : typeof v === "number" ? fmt(v) : v) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>"; }
+    out.innerHTML = "<h3>what changed: " + esc(d.a.run_id) + " → " + esc(d.b.run_id) + "</h3>" +
+      "<h3>config</h3>" + tbl(d.config_changes, ["key", "a", "b"]) +
+      "<h3>scores (0–1)</h3>" + tbl(d.score_changes, ["model", "principle", "a", "b", "delta"]) +
+      "<h3>raw metrics</h3>" + tbl(d.metric_changes.slice(0, 60), ["model", "tool", "metric", "a", "b", "delta"]) +
+      "<p class='prose small'>pareto front: " + esc((d.pareto_a || []).join(", ")) + " → " + esc((d.pareto_b || []).join(", ")) + "</p>";
   }
 
   function radar(box, sc) {
@@ -1033,7 +1181,8 @@
   // ------------------------------------------------------------------ tabs
   function showTab(name) {
     document.querySelectorAll(".tabs button").forEach(function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === name)); });
-    ["results", "inspect", "card", "suite", "gov"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
+    ["results", "inspect", "card", "data", "suite", "history", "gov"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
+    if (name === "history") renderHistory();
   }
 
   // ------------------------------------------------------------------ reference suites

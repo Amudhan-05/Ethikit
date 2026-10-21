@@ -104,6 +104,26 @@ def config_from_args(a: argparse.Namespace) -> dict:
     if a.checklist:
         from . import checklists
         cfg["checklist"] = checklists.load_answers(a.checklist)
+    if a.require:
+        cfg["requirements"] = list(a.require)
+    if a.no_save:
+        cfg["save"] = False
+    return cfg
+
+
+def load_config_file(path: str) -> dict:
+    """A config.json, a results.json (has a "config" key), or a saved run id / folder."""
+    from .runs import load_run, runs_dir
+    p = path
+    if not os.path.exists(p) and (runs_dir() / path).is_dir():
+        return load_run(path)["config"]
+    if os.path.isdir(p):
+        p = os.path.join(p, "config.json")
+    with open(p, encoding="utf-8") as fh:
+        data = json.load(fh)
+    cfg = data.get("config", data) if isinstance(data, dict) else None
+    if not isinstance(cfg, dict) or "data" not in cfg:
+        raise ValueError(f"{path} doesn't look like an ethikit config (no 'data' section)")
     return cfg
 
 
@@ -149,8 +169,20 @@ def cmd_run(a: argparse.Namespace) -> int:
     from . import session
     from .report import render_html, render_model_cards
 
-    cfg = config_from_args(a)
+    if a.config:
+        cfg = load_config_file(a.config)
+        if a.no_save:
+            cfg["save"] = False
+        print(D(f"config loaded from {a.config} (other run flags are ignored)"))
+    else:
+        cfg = config_from_args(a)
+    if a.export_config:
+        with open(a.export_config, "w", encoding="utf-8") as fh:
+            json.dump(cfg, fh, indent=2)
+        print(f"wrote {a.export_config}  (re-run with: ethikit run --config {a.export_config})")
+        return 0
     prepared = session.prepare(cfg)
+    _print_profile(prepared.profile)
     for note in prepared.notes:
         print(Y(f"note: {note}"))
     out = session.execute(prepared, on_event=LiveLog(a.verbose))
@@ -178,6 +210,11 @@ def cmd_run(a: argparse.Namespace) -> int:
     with pd.option_context("display.width", 200, "display.max_columns", 20):
         print(obj_show.to_string())
     print("\n" + B("pareto front") + ": " + ", ".join(G(m) for m in s["pareto"]))
+    _print_requirements(s.get("requirements"))
+    _print_stability(s.get("stability"))
+    if s.get("history_id"):
+        h = s["history_id"]
+        print(D(f"\nsaved as run {h}  (ethikit runs show {h} · ethikit run --config {h})"))
 
     os.makedirs(a.out, exist_ok=True)
     report = render_html(s["dataset"], obj, s["pareto"], os.path.join(a.out, "report.html"))
@@ -185,7 +222,8 @@ def cmd_run(a: argparse.Namespace) -> int:
                                out_dir=os.path.join(a.out, "model_cards"),
                                sensitive_name=s["sensitive"], checklist=prepared.checklist,
                                hyperparameters=prepared.hyperparameters,
-                               origins=prepared.origins)
+                               origins=prepared.origins, requirements=s.get("requirements"),
+                               data_profile=s.get("profile"))
     with open(os.path.join(a.out, "results.json"), "w", encoding="utf-8") as fh:
         json.dump({"config": cfg, **s}, fh)
     print(f"\n{D('wrote')} {report}\n{D('wrote')} {len(cards)} model cards in "
@@ -198,6 +236,112 @@ def cmd_run(a: argparse.Namespace) -> int:
                 for step in (t.get("trace") or {}).get("steps", []):
                     print("   " + step)
     return 0
+
+
+def _print_profile(p):
+    if not p:
+        return
+    print(B("data profile") + D(f"  {p['n_rows']} rows · {p['n_features']} features · sensitive: {p['sensitive']}"
+          + (f" · positive rate {p['positive_rate']}" if "positive_rate" in p else "")))
+    for g in p.get("groups", []):
+        extra = f"base rate {g['base_rate']}" if "base_rate" in g else f"mean target {g.get('mean_target')}"
+        print(f"  {g['group']:<22} n={g['n']:<7} share={g['share']:<7} {extra}")
+    px = p.get("proxy") or {}
+    if px.get("auc") is not None:
+        print(f"  proxy screen: other features predict the sensitive attribute with AUC {px['auc']}"
+              + D("  (0.5 = no information)"))
+    for w in p.get("warnings", []):
+        print(Y("  ! " + w))
+    print()
+
+
+def _print_requirements(req):
+    if not req:
+        return
+    print("\n" + B("requirements") + ": " + "; ".join(req["list"]))
+    for m, v in req["by_model"].items():
+        mark = G("meets all") if v["passes"] else R("fails")
+        why = "" if v["passes"] else "  " + "; ".join(f"{x['requirement']}: {x['reason']}"
+                                                      for x in v["results"] if not x["passes"])
+        print(f"  {m:<22} {mark}{why}")
+    print(("  feasible: " + ", ".join(G(m) for m in req["feasible"])) if req["feasible"]
+          else R("  no model meets every requirement -- relax one, or widen the candidate set"))
+
+
+def _print_stability(st):
+    if not st:
+        return
+    print("\n" + B("how stable is the order?"))
+    if not st.get("available"):
+        print(D("  " + st.get("reason", "not available")))
+        return
+    print(f"  first under your weights: {G(st['first'])}; {st['nearby_weights_keep_first']:.0%} of "
+          f"nearby weight settings keep it first" +
+          (f" (otherwise: {', '.join(st['main_rivals'])})" if st["main_rivals"] else ""))
+    for v in st["per_principle"].values():
+        print("  " + v["sentence"])
+
+
+def cmd_profile(a: argparse.Namespace) -> int:
+    from . import session
+    from .profile import profile_raw
+    cfg = config_from_args(a)
+    raw = session.load_raw(cfg["data"])
+    frame = None
+    if cfg["data"].get("source") == "csv":
+        import pandas as pd
+        frame = pd.read_csv(cfg["data"]["path"])
+    p = profile_raw(raw, frame, seed=a.seed)
+    _print_profile(p)
+    px = p.get("proxy") or {}
+    if px.get("top_features"):
+        print(B("strongest single-feature links to the sensitive attribute") + D("  (mutual information)"))
+        for f in px["top_features"]:
+            print(f"  {f['feature']:<30} {f['mutual_information']}")
+    if p.get("missing"):
+        print(B("missing values before imputation"))
+        for m in p["missing"]:
+            print(f"  {m['column']:<30} {m['share_missing']:.1%}")
+    return 0
+
+
+def cmd_runs(a: argparse.Namespace) -> int:
+    from .runs import diff_runs, list_runs, load_run, runs_dir
+    if a.action == "list":
+        runs = list_runs()
+        if not runs:
+            print(D(f"no saved runs yet in {runs_dir()}"))
+        for r in runs:
+            print(f"{G(r['run_id'])}  {r.get('dataset')}  models={','.join(r.get('models', []))}"
+                  + (f"  cv={r['cv']}" if r.get("cv") else ""))
+        return 0
+    if a.action == "show":
+        if not a.ids:
+            raise SystemExit("usage: ethikit runs show <run_id>")
+        r = load_run(a.ids[0])
+        print(json.dumps({"meta": r["meta"], "config": r["config"],
+                          "pareto": r["summary"].get("pareto"), "objective": r["summary"].get("objective"),
+                          "requirements": (r["summary"].get("requirements") or {}).get("feasible")}, indent=2))
+        return 0
+    if a.action == "diff":
+        if len(a.ids) != 2:
+            raise SystemExit("usage: ethikit runs diff <run_a> <run_b>")
+        d = diff_runs(*a.ids)
+        if d["identical"]:
+            print(G("identical: same config, same scores, same metrics"))
+            return 0
+        print(B("config changes"))
+        for c in d["config_changes"] or [{"key": "(none)", "a": "", "b": ""}]:
+            print(f"  {c['key']:<34} {c['a']!s:<20} -> {c['b']}")
+        print(B("score changes") + D("  (0-1 profile; models in both runs)"))
+        for c in d["score_changes"][:40]:
+            print(f"  {c['model']:<22} {c['principle']:<15} {c['a']} -> {c['b']}  ({c['delta']:+})" if c["delta"] is not None
+                  else f"  {c['model']:<22} {c['principle']:<15} {c['a']} -> {c['b']}")
+        if d["models_only_in_a"] or d["models_only_in_b"]:
+            print(B("models") + f"  only in a: {d['models_only_in_a']}  only in b: {d['models_only_in_b']}")
+        print(B("pareto front") + f"  a: {d['pareto_a']}   b: {d['pareto_b']}")
+        return 0
+    return 2
 
 
 def cmd_list(a: argparse.Namespace) -> int:
@@ -444,10 +588,33 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--no-scale", action="store_true",
                    help="don't standardise features (use with --model-file trained on raw data)")
     r.add_argument("--checklist", help="answers JSON from `ethikit checklist <id> --out`")
+    r.add_argument("--require", action="append", metavar="METRIC<=VALUE",
+                   help="hard requirement on a raw metric, e.g. demographic_parity_diff<=0.1 or "
+                        "aif360.theil_index<0.2 (repeatable); failing models are listed with the reason")
+    r.add_argument("--config", help="run exactly this config: a config.json, a results.json, or a saved run id")
+    r.add_argument("--export-config", metavar="PATH", help="write the config these flags describe and exit")
+    r.add_argument("--no-save", action="store_true", help="don't save this run to the local run history")
     r.add_argument("--out", default="ethikit_out", help="output directory")
     r.add_argument("--trace", action="store_true", help="print every tool's formula + worked steps")
     r.add_argument("-v", "--verbose", action="store_true")
     r.set_defaults(fn=cmd_run)
+
+    pf = sub.add_parser("profile", help="profile a dataset (groups, base rates, proxies, missingness) without training")
+    pf.add_argument("--data", default="synthetic")
+    pf.add_argument("--target"); pf.add_argument("--sensitive"); pf.add_argument("--sensitive-threshold", type=float)
+    pf.add_argument("--positive-label"); pf.add_argument("--exclude-sensitive", action="store_true")
+    pf.add_argument("--synthetic", nargs="+", metavar="KEY=VALUE")
+    pf.add_argument("--seed", type=int, default=0)
+    for k, v in dict(models=None, family=None, model_param=None, estimator=None, model_file=None, tools=None,
+                     tool_param=None, weights=None, test_size=0.3, no_scale=False, cv=None, checklist=None,
+                     require=None, no_save=True).items():
+        pf.set_defaults(**{k: v})
+    pf.set_defaults(fn=cmd_profile)
+
+    rh = sub.add_parser("runs", help="saved run history: list, show, diff")
+    rh.add_argument("action", choices=["list", "show", "diff"])
+    rh.add_argument("ids", nargs="*")
+    rh.set_defaults(fn=cmd_runs)
 
     ls = sub.add_parser("list", help="list datasets, models, tools, params or checklists")
     ls.add_argument("what", choices=["datasets", "models", "tools", "params", "checklists"])

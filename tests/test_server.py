@@ -97,3 +97,25 @@ def test_unknown_checklist_is_rejected(server):
     with pytest.raises(urllib.error.HTTPError) as e:
         post(f"{server}/api/checklist/{rid}", {"checklist": "made_up", "answers": {}})
     assert e.value.code == 400
+
+
+def test_result_keeps_the_server_run_id_and_carries_m3_fields(server):
+    cfg = {**SMALL, "models": [{"name": "decision_tree"}, {"name": "logistic_regression"}],
+           "requirements": ["demographic_parity_diff<=0.5"]}
+    ev = run_stream(server, cfg)
+    assert ev[0]["type"] == "prepare" and ev[1]["type"] == "profile"
+    res = ev[-1]
+    assert res["run_id"] == ev[0]["run_id"]                 # not clobbered by the saved-run id
+    assert res["history_id"] and res["requirements"]["feasible"] and res["stability"]["available"]
+    card = get(f"{server}/api/card/{res['run_id']}/decision_tree")[2].decode()
+    assert "Requirements you set" in card and "What the data says" in card
+
+
+def test_history_endpoints(server):
+    a = run_stream(server, SMALL)[-1]["history_id"]
+    b = run_stream(server, {**SMALL, "split": {"seed": 5}})[-1]["history_id"]
+    runs = json.loads(get(server + "/api/runs")[2])["runs"]
+    assert {a, b} <= {r["run_id"] for r in runs}
+    assert json.loads(get(f"{server}/api/runs/{a}")[2])["config"]["models"] == SMALL["models"]
+    d = json.loads(get(f"{server}/api/runs-diff?a={a}&b={b}")[2])
+    assert d["config_changes"]

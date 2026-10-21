@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FILES = ([ROOT / "README.md"] + list((ROOT / "docs").glob("*.html"))
          + [p for p in (ROOT / "ethikit").rglob("*") if p.suffix in {".py", ".js", ".html"}])
 BANNED = re.compile(r"best model|most ethical|\bwinner\b|\bcrown", re.I)
-OK_CONTEXT = re.compile(r"\bnot\b|\bno\b|\bnever\b|n't|\bnor\b|instead of|rather than|without|"
+OK_CONTEXT = re.compile(r"\bnot\b|\bno\b|\bnever\b|\bneither\b|n't|\bnor\b|instead of|rather than|without|"
                         r"pretend|\bsuite\b|this run|tendenc|\bnone\b|single|\bany\b|\bone\b|"
                         r"old claim|used to", re.I)
 

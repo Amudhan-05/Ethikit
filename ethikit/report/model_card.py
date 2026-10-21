@@ -182,6 +182,38 @@ def _trace_html(tool: str, t: dict) -> str:
     return "".join(parts)
 
 
+def _requirements_html(req: Optional[dict]) -> str:
+    esc = html.escape
+    if not req:
+        return ""
+    rows = "".join(
+        f"<tr><td><code>{esc(r['requirement'])}</code></td><td>{'-' if r['value'] is None else r['value']}</td>"
+        f"<td><span class='pill {'' if r['passes'] else 'bad'}'>{'meets' if r['passes'] else 'fails'}</span></td>"
+        f"<td class='mech'>{esc(r['reason'])}</td></tr>" for r in req["results"])
+    verdict = ("meets every requirement you set" if req["passes"] else
+               "<b>does not</b> meet every requirement you set")
+    return (f"<h2>Requirements you set</h2><p>This model {verdict}. Requirements are checked on "
+            f"raw metric values, so a threshold means the same thing whatever the other candidates are.</p>"
+            f"<table><tr><th>Requirement</th><th>Value</th><th></th><th>Why</th></tr>{rows}</table>")
+
+
+def _profile_html(p: Optional[dict]) -> str:
+    esc = html.escape
+    if not p:
+        return ""
+    groups = "".join(
+        f"<tr><td>{esc(str(g['group']))}</td><td>{g['n']}</td><td>{g['share']}</td>"
+        f"<td>{g.get('base_rate', g.get('mean_target', '-'))}</td></tr>" for g in p.get("groups", []))
+    px = p.get("proxy") or {}
+    proxy = (f"<p class='muted'>Proxy screen: {esc(px.get('method', ''))} -> AUC <b>{px['auc']}</b> "
+             f"(0.5 = the other features carry no information about the sensitive attribute).</p>"
+             if px.get("auc") is not None else "")
+    warns = "".join(f"<div>! {esc(w)}</div>" for w in p.get("warnings", []))
+    return (f"<h2>What the data says (before any model)</h2>"
+            f"<table><tr><th>Group</th><th>Rows</th><th>Share</th><th>Base rate</th></tr>{groups}</table>"
+            f"{proxy}" + (f"<div class='note'>{warns}</div>" if warns else ""))
+
+
 def _checklist_html(checklist: Optional[dict]) -> str:
     esc = html.escape
     if not checklist or checklist.get("checklist") not in checklists_mod.CHECKLISTS:
@@ -262,6 +294,8 @@ def _render_card_html(card: Dict[str, object]) -> str:
     traces = "".join(_trace_html(tool, t) for tool, t in card.get("traces", {}).items()) or (
         "<p class='muted'>No traces recorded for this run.</p>")
     checklist = _checklist_html(card.get("checklist"))
+    req_html = _requirements_html(card.get("requirements"))
+    profile_html = _profile_html(card.get("data_profile"))
     not_run = ""
     if card.get("tools_not_run"):
         not_run = ("<h2>Tools that did not run</h2><p class='muted'>These registered tools were "
@@ -312,6 +346,8 @@ but weren't the source of these numbers (grey) -- a second opinion is one <code>
 call away. Full reverse map: <code>ethikit.coverage.principle_to_tools()</code>.</p>
 <table><tr><th>Principle</th><th>Used here</th><th>Also available</th></tr>{coverage_rows}</table>
 
+{req_html}
+{profile_html}
 {not_run}
 <h2>Ethical considerations</h2>
 <p>Metrics above cover only <i>tool-addressable</i> principles -- the ones a library can
@@ -340,12 +376,18 @@ def model_card_html(model_name: str, dataset_name: str, raw: pd.DataFrame,
                     sensitive_name: Optional[str] = None,
                     hyperparameters: Optional[Dict[str, object]] = None,
                     origin: Optional[str] = None,
-                    checklist: Optional[dict] = None) -> str:
+                    checklist: Optional[dict] = None,
+                    requirements: Optional[dict] = None,
+                    data_profile: Optional[dict] = None) -> str:
     """One model's card as an HTML string. Traces come from raw.attrs["traces"]
-    (set by run_benchmark); `checklist` is a checklists answers dict."""
+    (set by run_benchmark); `checklist` is a checklists answers dict; `requirements` is this
+    model's entry from decision.check_requirements (plus the requirement texts); `data_profile`
+    is profile.profile_raw() for the dataset."""
     traces = (raw.attrs.get("traces") or {}).get(model_name, {})
     card = _card_data(model_name, dataset_name, sensitive_name, raw, profile.loc[model_name],
                       model_name in pareto, hyperparameters, origin, traces, checklist)
+    card["requirements"] = requirements
+    card["data_profile"] = data_profile
     return _render_card_html(card)
 
 
@@ -357,7 +399,9 @@ def render_model_cards(dataset_name: str,
                        sensitive_name: Optional[str] = None,
                        checklist: Optional[dict] = None,
                        hyperparameters: Optional[Dict[str, Dict[str, object]]] = None,
-                       origins: Optional[Dict[str, str]] = None) -> List[str]:
+                       origins: Optional[Dict[str, str]] = None,
+                       requirements: Optional[dict] = None,
+                       data_profile: Optional[dict] = None) -> List[str]:
     """Write one Model Card HTML (+ best-effort .mct.json sidecar) per model.
 
     `raw` is the un-normalized run_benchmark() output (has per-metric values and
@@ -372,6 +416,8 @@ def render_model_cards(dataset_name: str,
                           profile.loc[model_name], model_name in pareto,
                           (hyperparameters or {}).get(model_name),
                           (origins or {}).get(model_name), traces, checklist)
+        card["requirements"] = ((requirements or {}).get("by_model") or {}).get(model_name)
+        card["data_profile"] = data_profile
         out_path = os.path.join(out_dir, f"{model_name}.html")
         with open(out_path, "w", encoding="utf-8") as fh:
             fh.write(_render_card_html(card))

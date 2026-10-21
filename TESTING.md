@@ -118,21 +118,41 @@ python -m pytest -m e2e           # 17 browser tests
 6. In *my data* mode type `3x2` in `--cv` and run; **see** `±` on every cell of the comparison table and "cross-validation fold i / n" counting up while the flow graph animates once.
 7. Search the page text for "best" / "most ethical" / "winner"; **see** none presented as a claim.
 
-## M3 -- Decision support
+## M3 -- Decision support  *(built)*
 
 **Automated**
-- `pytest tests/test_constraints.py` -- `--require demographic_parity_diff<=0.1` keeps only passing models and records, for each failure, which constraint failed and by how much.
-- `pytest tests/test_sensitivity.py` -- when one model dominates on every principle the "weights needed to change the pick" is infinite/none; for a two-model trade-off it returns the correct crossover weight.
-- `pytest tests/test_runs.py` -- save -> list -> load round-trips a run; `diff` lists exactly the changed metrics.
-- `pytest tests/test_config.py` -- `ethikit run --config run.json` reproduces the same numbers as the original run (same seed).
-- `pytest tests/test_profile.py` -- group sizes and base rates per group match a hand-computed pandas groupby; a feature that predicts the sensitive attribute is flagged as a proxy.
+
+```bash
+python -m pytest tests/test_decision.py tests/test_profile_runs.py      # ~40 tests
+python -m pytest -m e2e -k "requirement or profile or history or export"
+```
+
+- `tests/test_decision.py` -- requirement parsing (and a helpful error with an example on a typo); failures report **which** requirement and **by how much** (`margin`, "above"/"below"); an unknown metric lists the available ones; a metric reported by two tools must be prefixed (`aif360.theil_index<0.2`); **an unmeasured metric counts as a failure, never a pass**; stability finds the switch point and who takes over, a dominant model is "stable for any weight", single-candidate / no-weight cases explain themselves; reproducible.
+- `tests/test_profile_runs.py` -- group sizes and base rates match a hand computation; under-represented groups are flagged; **the proxy screen finds the injected proxy (`proxy_income`) and never counts the sensitive column itself**; missingness comes from the original file; the profile is emitted before any model runs; requirements + stability appear in every summary; a requirement typo fails before training; "nothing feasible" is explained; every run is saved, listed, **reloaded and reproduced identically**; diffs name config and score changes; console uploads are made portable in saved configs; CLI `--require`, `--config`, `--export-config`, `runs diff`, `profile`.
+- `tests/test_server.py` -- the run result keeps its own run id (a saved-run id must not overwrite it), carries requirements/stability/profile; the model card shows them; history endpoints list, load and diff runs.
+- `tests/e2e/test_console.py` -- requirement chips (and their error message), feasible models listed first and failing ones struck through, data-profile tab, history compare + load-config, export/import config round-trip.
+
+**Bugs found and fixed while building M3**
+- A run's weighted order used to put models that *fail* your requirements first; feasible ones now come first and failing rows are struck through.
+- The stability check took ~57 s per run: pandas deep-copied the run's traces on every one of thousands of small operations. It now runs on plain arrays (whole test suite 101 s -> 26 s).
+- The console logged a 404 for `/favicon.ico` on every load; it now has an icon.
 
 **Manual / visual**
-1. Set a constraint in the console; **see** models that fail it in a separate "excluded, and why" list, not silently missing.
-2. Open **choice stability**; **see** a plain sentence such as "the pick changes if fairness weight drops below 0.2".
-3. Run twice with different seeds, then **compare runs**; **see** a side-by-side diff with the changes highlighted.
-4. **Export config**, restart the server, **import config**, run; **see** identical numbers.
-5. The new **data profile** step appears before any model runs; **see** group sizes, base rates and a proxy-feature table.
+
+| # | Do | You must see |
+|---|---|---|
+| M3.1 | `python -m ethikit run --models logistic_regression,decision_tree,naive_bayes --require "demographic_parity_diff<=0.45"` | a **data profile** block first (groups, base rates, proxy AUC ~0.71 and two `!` warnings), then the comparison, then **requirements** with `naive_bayes fails ... 0.61 is 0.16 above the limit`, then **how stable is the order?** with one plain sentence per weighted principle, then `saved as run <id>` |
+| M3.2 | `python -m ethikit run --config <that id>` then `python -m ethikit runs diff <id1> <id2>` | `identical: same config, same scores, same metrics` |
+| M3.3 | repeat M3.1 with `--seed 7`, then `runs diff` against the first | `split.seed 0 -> 7` and a list of score changes |
+| M3.4 | `python -m ethikit run --require "parity<0.1"` | a one-line error naming the metrics that do exist |
+| M3.5 | `python -m ethikit profile --synthetic proxy_strength=2.5` | proxy AUC well above 0.8 and `proxy_income` at the top of the mutual-information list |
+| M3.6 | `python -m ethikit profile --data your.csv --target ... --sensitive ...` | a "missing values before imputation" section if your CSV has blanks |
+| M3.7 | Console: type `demographic_parity_diff<=0.44` in `--require`, press Enter, run | a gold chip, the flag in the command line, a **requirements** column (meets / fails), failing models **struck through and listed last**, an "excluded, and why" box with margins, and the stability sentences |
+| M3.8 | Console: open **data-profile** right after pressing run | the profile is there before the models finish |
+| M3.9 | Console: run twice with different seeds, open **history**, tick both, **compare selected** | config / scores / raw-metrics tables with green and red deltas |
+| M3.10 | **history** -> **load config** on an older run | every control (models, params, tools, weights, seed, cv, requirements) returns to that run's values |
+| M3.11 | **export config**, reload the page, **import config** with that file | the command line comes back identical |
+| M3.12 | Open a model card of a failing model | "Requirements you set" with *does not meet* and the reason; "What the data says (before any model)" |
 
 ## M4 -- Tool depth
 

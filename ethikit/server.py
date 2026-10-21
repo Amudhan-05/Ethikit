@@ -101,6 +101,8 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         path = unquote(url.path)
         try:
+            if path == "/favicon.ico":               # the page declares an inline icon; answer quietly
+                return self._send(204, b"", "image/x-icon")
             if path in ("/", "/index.html"):
                 return self._static("index.html")
             if path == "/api/meta":
@@ -108,6 +110,16 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/card/"):
                 _, _, _, run_id, model = path.split("/", 4)
                 return self._card(run_id, model)
+            if path == "/api/runs":
+                from .runs import list_runs
+                return self._json({"runs": list_runs()})
+            if path.startswith("/api/runs/"):
+                from .runs import load_run
+                return self._json(load_run(path.rsplit("/", 1)[1]))
+            if path == "/api/runs-diff":
+                from .runs import diff_runs
+                q = parse_qs(url.query)
+                return self._json(diff_runs(q["a"][0], q["b"][0]))
             if path.startswith("/api/report/"):
                 run = RUNS[path.rsplit("/", 1)[1]]
                 s = run["summary"]
@@ -189,7 +201,9 @@ class Handler(BaseHTTPRequestHandler):
                                sensitive_name=s["sensitive"],
                                hyperparameters=run["prepared"].hyperparameters.get(model),
                                origin=run["prepared"].origins.get(model),
-                               checklist=run.get("checklist"))
+                               checklist=run.get("checklist"),
+                               requirements=((s.get("requirements") or {}).get("by_model") or {}).get(model),
+                               data_profile=s.get("profile"))
         self._send(200, html.encode(), "text/html; charset=utf-8")
 
     def _domain_run(self, cfg: dict):

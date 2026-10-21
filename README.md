@@ -114,6 +114,27 @@ python -m pytest -m e2e           # drives the console in headless Chromium (pla
 - *Port in use:* `python -m ethikit serve --port 9000`.
 - *Loading `--model-file`:* only load files you trust; they are unpickled.
 
+## Choosing, not ranking: requirements, stability, profile, history
+
+```bash
+ethikit run --require "demographic_parity_diff<=0.1" --require "membership_inference_advantage<0.2"
+ethikit profile --data loans.csv --target approved --sensitive sex   # the data alone, before any model
+ethikit runs list                                                    # every run is saved in ./ethikit_runs
+ethikit runs diff <run_a> <run_b>                                    # what changed, config and scores
+ethikit run --config <run_id | config.json | results.json>           # reproduce a run exactly
+ethikit run ... --export-config my_audit.json                        # save a config without running
+```
+
+- **Requirements** are hard limits on raw metric values. Models that fail are listed with the
+  requirement and the margin, never hidden; an unmeasured metric counts as a failure.
+- **Choice stability** says how far your weights would have to move before a different model
+  comes first ("decision_tree stays first while fairness's share is 0.00-0.95; above that
+  random_forest takes over").
+- **Data profile** runs before any model: group sizes, base rates per group, a proxy screen
+  (can the other features recover the sensitive attribute?), and missingness.
+- **History**: every run is saved locally (`ETHIKIT_RUNS` to move it); diff two runs, or reload
+  one's config in the console's *history* tab. *export config* / *import config* do the same by file.
+
 ## Reference suites: choosing a starting model before you have data
 
 No data or trained model of your own yet? A **reference suite** runs the same ethics battery over

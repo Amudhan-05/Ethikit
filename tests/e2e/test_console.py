@@ -173,3 +173,69 @@ def test_cv_flag_appears_in_the_command_and_the_table_shows_spread(page):
     page.wait_for_function("document.querySelector('#run-label').textContent.length > 0", timeout=120000)
     assert "±" in page.inner_text("#tab-results table.t")
     assert not page.errors, page.errors
+
+
+# ------------------------------------------------------------------ M3: decision support
+def test_requirement_chip_flows_to_command_results_and_exclusions(page):
+    _light_tools(page)
+    page.fill("#req-input", "demographic_parity_diff<=0.42")
+    page.click("#req-add")
+    assert '--require "demographic_parity_diff<=0.42"' in page.inner_text("#cmd-preview")
+    page.fill("#req-input", "parity is low")
+    page.click("#req-add")
+    assert "write it like" in page.inner_text("#req-err")
+    page.click("#run")
+    page.wait_for_function("document.querySelector('#run-label').textContent.length > 0", timeout=120000)
+    txt = page.inner_text("#tab-results").lower()          # headings are CSS-uppercased
+    assert "requirements" in txt and "feasible:" in txt and "how stable is the order?" in txt
+    assert page.locator("#tab-results .pill.red").count() + page.locator("#tab-results .pill:text('meets')").count() >= 3
+    rows = page.locator("#tab-results table.t tr")
+    classes = [rows.nth(i).get_attribute("class") or "" for i in range(1, rows.count())]
+    assert classes == sorted(classes, key=lambda c: "excluded" in c), "feasible models must come first"
+    assert not page.errors, page.errors
+
+
+def test_data_profile_tab_shows_groups_proxy_and_warnings(page):
+    _light_tools(page)
+    page.click("#run")
+    page.wait_for_function("document.querySelector('#run-label').textContent.length > 0", timeout=120000)
+    page.click("[data-tab=data]")
+    txt = page.inner_text("#tab-data").lower()             # headings are CSS-uppercased
+    assert "before any model" in txt and "proxy screen" in txt and "auc" in txt
+    assert "base rates differ" in txt                      # the synthetic data is biased on purpose
+
+
+def test_history_compare_and_load_config(page):
+    _light_tools(page)
+    for seed in ("0", "4"):
+        page.fill("#seed", seed)
+        page.click("#run")
+        page.wait_for_function("document.querySelector('#run-label').textContent.length > 0", timeout=120000)
+        page.evaluate("document.querySelector('#run-label').textContent=''")
+    page.click("[data-tab=history]")
+    page.wait_for_selector("#tab-history .hsel")
+    boxes = page.locator("#tab-history .hsel")
+    assert boxes.count() >= 2
+    boxes.nth(0).check(); boxes.nth(1).check()
+    page.click("#hdiff")
+    page.wait_for_selector("#hdiff-out h3")
+    assert "split.seed" in page.inner_text("#hdiff-out")
+    page.fill("#seed", "11")
+    page.locator("#tab-history .hload").nth(1).click()
+    page.wait_for_function("document.querySelector('#seed').value === '0'")
+
+
+def test_export_then_import_config_roundtrip(page, tmp_path):
+    page.locator("#models .chip").nth(3).click()
+    page.fill("#req-input", "accuracy>=0.5"); page.click("#req-add")
+    page.fill("#cv", "3x2")
+    with page.expect_download() as dl:
+        page.click("#export-config")
+    path = tmp_path / "cfg.json"
+    dl.value.save_as(path)
+    cmd_before = page.inner_text("#cmd-preview")
+    page.reload(); page.wait_for_selector("#models .chip")
+    assert page.inner_text("#cmd-preview") != cmd_before
+    page.set_input_files("#import-config", str(path))
+    page.wait_for_function("document.querySelector('#cv').value === '3x2'")
+    assert page.inner_text("#cmd-preview") == cmd_before

@@ -64,7 +64,7 @@ only as relevant as its resemblance to *your* population.
 **Exit:** `ethikit domains run lending` gives per-domain family tables **with fairness columns**
 and spreads; the console can show them; no doc claims a cross-domain finding the suite can't support.
 
-## M3 -- Decision support (the "select" half of selection-and-audit)
+## M3 -- Decision support (the "select" half of selection-and-audit)  **[BUILT]**
 
 | # | Work | Size |
 |---|---|---|

@@ -71,6 +71,10 @@ class PreparedRun:
     raw: Any = None                                # the unsplit RawData (needed for repeated CV)
     cv: Optional[tuple] = None                     # (folds, repeats) or None
     dataset_seed: int = 0
+    requirements: list = field(default_factory=list)   # decision.Requirement
+    profile: Optional[dict] = None                 # dataset profile (computed before any model)
+    config: Optional[dict] = None                  # the config this run came from (for history)
+    save: bool = True
 
 
 def load_raw(data: Dict[str, Any], uploads: Optional[Dict[str, pd.DataFrame]] = None):
@@ -105,7 +109,17 @@ def load_raw(data: Dict[str, Any], uploads: Optional[Dict[str, pd.DataFrame]] = 
 
 def prepare(config: Dict[str, Any], uploads: Optional[Dict[str, pd.DataFrame]] = None,
             uploaded_models: Optional[Dict[str, Any]] = None) -> PreparedRun:
+    from .decision import parse_requirements
+    from .profile import profile_raw
+    requirements = parse_requirements(config.get("requirements"))   # fail fast on a typo
     raw = load_raw(config.get("data") or {}, uploads)
+    data_cfg = config.get("data") or {}
+    frame = None
+    if data_cfg.get("source") == "upload":
+        frame = (uploads or {}).get(data_cfg.get("upload_id"))
+    elif data_cfg.get("source") == "csv":
+        frame = pd.read_csv(data_cfg["path"])
+    profile = profile_raw(raw, frame, seed=int((config.get("split") or {}).get("seed") or 0))
     split = {"test_size": 0.3, "seed": 0, "scale": True, **(config.get("split") or {})}
     cv = split.get("cv")
     cv = (int(cv[0]), int(cv[1])) if cv else None
@@ -163,12 +177,17 @@ def prepare(config: Dict[str, Any], uploads: Optional[Dict[str, pd.DataFrame]] =
     if raw.name.startswith("synthetic") and (config.get("data") or {}).get("source") == "adult":
         notes.append("UCI Adult was unreachable (no network); fell back to synthetic data.")
     return PreparedRun(ds, factories, prefit, evaluators, hyper, origins, weights,
-                       checklist, notes, raw=raw, cv=cv, dataset_seed=int(split["seed"]))
+                       checklist, notes, raw=raw, cv=cv, dataset_seed=int(split["seed"]),
+                       requirements=requirements, profile=profile, config=config,
+                       save=bool(config.get("save", True)))
 
 
 def execute(run: PreparedRun, on_event: Optional[Callable[[dict], None]] = None) -> Dict[str, Any]:
     """Run the sweep and score it. Returns everything a UI needs, JSON-ready
     except `raw` (the DataFrame, kept for rendering cards/reports)."""
+    emit = on_event or (lambda e: None)
+    if run.profile:
+        emit({"type": "profile", **jsonable(run.profile)})
     obj_std = None
     if run.cv:
         raw, obj, obj_std = _execute_cv(run, on_event)
@@ -183,7 +202,18 @@ def execute(run: PreparedRun, on_event: Optional[Callable[[dict], None]] = None)
         ranked["weighted_score"] = weighted_score(ranked, {p: run.weights[p] for p in principles}).round(3)
         ranked = ranked.sort_values("weighted_score", ascending=False)
     records = raw.to_dict(orient="records")
-    return {
+    from .decision import check_requirements, choice_stability
+    req = None
+    if run.requirements:
+        by_model = check_requirements(raw, run.requirements, list(obj.index))
+        feasible = [m for m in obj.index if by_model[m]["passes"]]
+        req = {"list": [r.text for r in run.requirements], "by_model": by_model, "feasible": feasible}
+    weights_used = {p: run.weights[p] for p in principles}
+    stability = choice_stability(obj, weights_used,
+                                 candidates=(req["feasible"] if req else None) or None) \
+        if principles and (not req or req["feasible"]) else \
+        {"available": False, "reason": "no model meets every requirement" if req else "no weights"}
+    out = {
         "raw": raw,
         "objective": obj,
         "pareto": front,
@@ -201,8 +231,13 @@ def execute(run: PreparedRun, on_event: Optional[Callable[[dict], None]] = None)
                 m: {k: (None if pd.isna(v) else float(v)) for k, v in row.items()}
                 for m, row in obj_std.iterrows()},
             "notes": run.notes,
+            "requirements": req, "stability": stability, "profile": run.profile,
         }),
     }
+    if run.save and run.config is not None:
+        from .runs import save_run
+        out["summary"]["history_id"] = save_run(run.config, out["summary"])
+    return out
 
 
 def _execute_cv(run: PreparedRun, on_event):
