@@ -19,7 +19,7 @@ phase2 = ["pmlb>=1.0", "scipy>=1.11", "scikit-posthocs>=0.9"]
 phase3 = ["adversarial-robustness-toolbox>=1.17", "alibi-detect>=0.12"]
 domains = ["folktables>=0.0.12"]
 deep = ["torch>=2.2", "captum>=0.7", "opacus>=1.5"]
-dev = ["pytest>=8", "jsonschema>=4", "pyyaml>=6", "playwright>=1.45"]
+dev = ["pytest>=8", "jsonschema>=4", "pyyaml>=6", "playwright>=1.45", "axe-playwright-python>=0.1.4"]
 
 [project.scripts]
 ethikit = "ethikit.cli:main"

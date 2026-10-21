@@ -128,8 +128,22 @@
       $("#row-modelfile").hidden = true;
       $("#run").textContent = "▶ replay run";
     }
-    document.querySelectorAll(".tabs button").forEach(function (b) {
+    // WAI-ARIA tabs: arrow keys / Home / End move between tabs, only the selected tab is in the
+    // Tab order, and each panel is labelled by its tab.
+    var tabBtns = Array.prototype.slice.call(document.querySelectorAll(".tabs button"));
+    tabBtns.forEach(function (b, i) {
+      b.id = "tabbtn-" + b.dataset.tab;
+      b.setAttribute("aria-controls", "tab-" + b.dataset.tab);
+      $("#tab-" + b.dataset.tab).setAttribute("aria-labelledby", b.id);
+      b.tabIndex = b.getAttribute("aria-selected") === "true" ? 0 : -1;
       b.addEventListener("click", function () { showTab(b.dataset.tab); });
+      b.addEventListener("keydown", function (e) {
+        var j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabBtns.length - 1 }[e.key];
+        if (j === undefined) return;
+        e.preventDefault();
+        var t = tabBtns[(j + tabBtns.length) % tabBtns.length];
+        showTab(t.dataset.tab); t.focus();
+      });
     });
 
     var saved = load("answers");
@@ -1290,7 +1304,9 @@
 
   // ------------------------------------------------------------------ tabs
   function showTab(name) {
-    document.querySelectorAll(".tabs button").forEach(function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === name)); });
+    document.querySelectorAll(".tabs button").forEach(function (b) {
+      b.setAttribute("aria-selected", String(b.dataset.tab === name)); b.tabIndex = b.dataset.tab === name ? 0 : -1;
+    });
     ["results", "inspect", "card", "data", "suite", "history", "gov"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
     if (name === "history") renderHistory();
   }

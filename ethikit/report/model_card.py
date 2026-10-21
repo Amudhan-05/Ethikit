@@ -271,7 +271,7 @@ def _render_card_html(card: Dict[str, object]) -> str:
                        f"<td><code>{esc(t['hint'] or 'see requirements.txt')}</code></td></tr>"
                        for t in card["tools_not_run"]) + "</table>")
 
-    return f"""<!doctype html><html><head><meta charset="utf-8">
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Model Card - {name}</title>{head_assets("model_cards/" + name)}<style>{_STYLE}</style></head>
 <body><main class="page">

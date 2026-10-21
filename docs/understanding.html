@@ -60,7 +60,7 @@ article.component .file{font-family:var(--font-mono); font-size:12px; color:var(
 .subhead:first-of-type{margin-top:20px}
 
 .formula{background:var(--mono-surface); color:var(--mono-ink); font-family:var(--font-mono); font-size:13px; padding:12px 16px; border-radius:5px; margin:10px 0; overflow-x:auto; line-height:1.6}
-.formula .c{opacity:.6}
+.formula .c{color:var(--ink-dim)}
 
 .app-box{background:var(--blue-soft); border:1px solid var(--blue-rule); border-radius:5px; padding:14px 18px; margin-top:14px}
 .app-box .lbl{font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--blue); display:block; margin-bottom:6px}
@@ -88,7 +88,7 @@ figcaption{font-size:13px; color:var(--ink-faint); margin-top:10px; max-width:66
 .philosophy-list{counter-reset:phil; display:flex; flex-direction:column; gap:0}
 .phil{counter-increment:phil; display:grid; grid-template-columns:44px 1fr; gap:16px; padding:20px 0; border-bottom:1px solid var(--rule)}
 .phil:last-child{border-bottom:none}
-.phil::before{content:counter(phil); font-family:var(--font-display); font-size:26px; font-weight:800; color:var(--rule-strong)}
+.phil::before{content:counter(phil); font-family:var(--font-display); font-size:26px; font-weight:800; color:var(--ink-faint)}
 .phil h4{font-size:16.5px; margin-bottom:5px}
 .phil p{font-size:14.5px; color:var(--ink-dim); margin:0}
 

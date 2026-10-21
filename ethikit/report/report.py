@@ -46,7 +46,7 @@ def render_html(dataset_name: str,
 def report_html(dataset_name: str, profile: pd.DataFrame, pareto: List[str],
                 notes: Optional[str] = None) -> str:
     """The aggregate report as an HTML string (render_html writes it to disk)."""
-    return f"""<!doctype html><html><head><meta charset="utf-8">
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ethikit report - {dataset_name}</title>
 {head_assets("report")}

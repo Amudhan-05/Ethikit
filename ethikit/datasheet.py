@@ -238,7 +238,7 @@ def to_html(sheet: Dict[str, Any]) -> str:
     style = BASE + """body{max-width:860px}h1{font-size:24px}
 h2{font-size:15px;margin-top:30px;border-bottom:1px solid var(--rule);padding-bottom:6px}.q{margin:14px 0}.q p{margin:4px 0}
 .open{color:var(--gold);font-style:italic}.by{font-size:12px;color:var(--ink-faint);font-family:var(--font-mono)}"""
-    return (f"<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, "
+    return (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, "
             f"initial-scale=1'><title>{esc(sheet['title'])}</title>{head_assets('datasheet')}<style>{style}</style>"
             f"</head><body><main class='page'><h1>{esc(sheet['title'])}</h1><div class='sub'>after {esc(sheet['after'])}"
             f"<br>generated {esc(sheet['generated'])} · {c['answered']} of {c['total']} questions answered</div>"
