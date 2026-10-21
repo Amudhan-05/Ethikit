@@ -1,6 +1,6 @@
 """Minimal, dependency-free HTML report.
 
-Renders the leaderboard, the per-principle profile, and the Pareto front into
+Renders the comparison table, the per-principle profile, and the Pareto front into
 a single self-contained HTML file. This is the seed of the Model-Card-style
 output; swap in Google's Model Card Toolkit later for a standards-compliant
 card per model.

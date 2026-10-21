@@ -8,6 +8,14 @@ that best fits their context.
 
 Built around the principle sets published by **UNESCO, Microsoft, IBM, and Google**.
 
+## What it is -- and isn't
+
+ethikit is a **model-selection and audit tool built on ethical principles**. It is *not* a
+model ranker or an ethics scorer. You bring a dataset and candidate models; it runs
+open-source tools that each measure one principle, shows every candidate's full profile and
+the trade-offs between them, and leaves an auditable trail (formulas, intermediate numbers,
+model cards, governance checklists) so a human can choose -- and justify the choice.
+
 ## Why it exists
 
 "The most ethical model" is not a single number. Some fairness criteria are
@@ -32,7 +40,10 @@ the same battery across repeated stratified folds so every score becomes a *dist
 and `ethikit.scoring.significance` runs a Friedman test (+ Nemenyi post-hoc, + critical-
 difference diagram) so "model A beats model B" is a hypothesis test, not eyeballing two
 means. `ethikit.benchmark.meta` runs the same idea across *multiple datasets* (via PMLB),
-so "best model per family, in general" is an aggregate finding, not a one-dataset story.
+so a *family-level tendency* is an aggregate finding, not a one-dataset story. Caveat: the
+default suite is a generic PMLB sample with no sensitive attribute (so fairness does not run
+in it) and is not organised by domain; treat it as evidence about utility / robustness /
+privacy tendencies, and run per-domain suites yourself before claiming more.
 See `examples/run_phase2_demo.py`.
 
 A fourth thing: the Phase-1 privacy check and the Gaussian-noise robustness check were
@@ -72,7 +83,7 @@ install). Every control is a CLI flag, and the console shows the equivalent `eth
 as you click. Pressing run streams the sweep live through a flow graph: inputs → each tool,
 grouped under the principle it measures → results per principle. After the run you get:
 
-- **results** -- the leaderboard (re-ranks instantly when you change the weights), radar, Pareto front
+- **results** -- the comparison table (re-orders instantly when you change the weights), radar, Pareto front
 - **inspect** -- for any model × tool: the formula, the same formula worked through with this
   run's numbers, and the intermediate artefacts (per-group tables, the attacker's
   member/non-member histograms, the surrogate tree's rules, per-feature drift p-values, ...)
@@ -145,7 +156,7 @@ ethikit/
     cv.py                 Phase 2: repeated stratified K-fold -> a score DISTRIBUTION
                           per model instead of one split's point estimate
     meta.py                Phase 2: the same sweep across many PMLB datasets, aggregated,
-                          for "best model per family in general" (not one dataset)
+                          for family-level tendencies across datasets (not one dataset; not per-domain)
   scoring/
     aggregate.py          normalize -> profile -> Pareto -> optional weighted score
     significance.py        Phase 2: Friedman + Nemenyi + critical-difference diagram,

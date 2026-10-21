@@ -67,10 +67,11 @@
 <div class="wrap">
 
   <div class="kicker">Project Proposal &middot; v0.1</div>
-  <h1>Ethikit: a scorecard for<br><span class="accent">how ethical a model is</span></h1>
-  <p class="lede">Give it a dataset and some models. It runs a battery of open-source
-  checks, and tells you — in one picture — how each model does on fairness, transparency,
-  explainability, privacy, and safety. So a person can choose with eyes open.</p>
+  <h1>Ethikit: model selection &amp;<br><span class="accent">audit on ethical principles</span></h1>
+  <p class="lede">Give it your dataset and your candidate models. It runs a battery of open-source
+  checks and shows each model's profile across fairness, transparency, explainability,
+  privacy, and safety — with the maths behind every number. It is not a ranker: it helps a
+  person choose, and leaves an audit trail to justify the choice.</p>
 
   <!-- ============ WHAT & WHY ============ -->
   <h2>The problem, in one line</h2>
@@ -158,12 +159,12 @@
 
   <!-- ============ HOW IT WORKS ============ -->
   <h2>How the orchestrator works</h2>
-  <p>Everything is a pipeline. A dataset and models go in the left; a scorecard comes out
+  <p>Everything is a pipeline. A dataset and models go in the left; a profile and audit trail come out
   the right. The clever part is the middle: every tool is wrapped behind the <em>same</em>
   plug, so adding a new one never changes anything downstream.</p>
 
   <figure>
-  <svg viewBox="0 0 880 250" width="100%" role="img" aria-label="Ethikit pipeline from inputs to scorecard">
+  <svg viewBox="0 0 880 250" width="100%" role="img" aria-label="Ethikit pipeline from inputs to profile and audit trail">
     <style>
       .bx{fill:var(--bg-raised);stroke:var(--rule-strong);stroke-width:1.5}
       .bt{font-family:var(--font-body);font-size:13px;fill:var(--ink);font-weight:600}
@@ -214,7 +215,7 @@
     <text x="700" y="183" text-anchor="middle" class="bt">Report / Model Card</text>
     <text x="700" y="199" text-anchor="middle" class="bs">shareable, auditable</text>
   </svg>
-  <figcaption>Add a tool by writing one small file. The scorecard, radar, and report update themselves.</figcaption>
+  <figcaption>Add a tool by writing one small file. The profile, radar, and report update themselves.</figcaption>
   </figure>
 
   <!-- ============ USE ============ -->
@@ -241,7 +242,7 @@
   robustness attacks; generate standards-compliant Model Cards.</p>
   <p><b>Later:</b> the same framework extends to <b>deep learning and large language
   models</b> (bias, hallucination, red-teaming) — because every tool sits behind the same
-  plug, the scorecard stays the same; only the checks change.</p>
+  plug, the profile and audit trail stay the same; only the checks change.</p>
 
   <div class="foot">
     Ethikit &middot; open-source ethical-AI evaluation orchestrator &middot; built on Fairlearn,

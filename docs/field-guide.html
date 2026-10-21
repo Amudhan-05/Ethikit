@@ -206,7 +206,7 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
           <h3>Open on the problem, not the tool</h3>
           <div class="cue-meta"><span class="pill time">45 sec</span><span class="pill">framing</span></div>
           <p>Don't lead with code. Lead with the actual hard problem: you can't compress "is this model ethical" into one number, because some fairness definitions are mathematically incompatible with each other — satisfying one can force you to violate another (Kleinberg / Chouldechova). So ethikit refuses to fake a single score.</p>
-          <div class="cue-say"><b>Say</b>"Ethikit isn't a scorer — it's an orchestrator. It runs real fairness, privacy, and robustness tools against your models and lays out the trade-offs, instead of pretending there's one 'most ethical' answer."</div>
+          <div class="cue-say"><b>Say</b>"Ethikit isn't a ranker or a scorer — it's a model-selection and audit tool. It runs real fairness, privacy, and robustness tools against <em>your</em> models on <em>your</em> data, lays out the trade-offs, and leaves an audit trail, instead of pretending there's one 'most ethical' answer."</div>
         </div>
       </div>
 
@@ -445,7 +445,7 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
         <dl>
           <dt>In</dt><dd>a model zoo, optionally a list of PMLB dataset names</dd>
           <dt>Out</dt><dd>one run per dataset, concatenated, plus a per-family "best in general" board averaged across all of them</dd>
-          <dt>Read</dt><dd>"Best model per family" becomes a claim about many datasets, not a one-dataset anecdote.</dd>
+          <dt>Read</dt><dd>Family-level tendencies become a claim about many datasets, not one anecdote — but this suite is generic (not per-domain, no sensitive attribute), so it speaks to utility, robustness and privacy, not fairness.</dd>
         </dl>
       </div>
     </div>
@@ -567,7 +567,7 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
       <div class="dcard"><span class="k">1 = always best</span><p><code>normalize()</code> min-max scales every metric to [0,1] and flips the direction when <code>higher_is_better=False</code>, so you never have to remember which way a raw metric points. A radar chart spoke of 1.0 is always the best result in that run, on that principle, full stop.</p></div>
       <div class="dcard"><span class="k">Scores are relative, not absolute</span><p>1.0 means "best among the models actually compared in this run" — not "perfect." Adding a worse model to the sweep can push everyone else's normalized scores up without anything about them changing.</p></div>
       <div class="dcard"><span class="k">mechanism is never empty</span><p>Every <code>EvalResult</code> carries a mandatory <code>mechanism</code> string with this run's real numbers — sample size, backend, groups compared. If a report shows a value with no explanation, that's a bug, not a design choice.</p></div>
-      <div class="dcard"><span class="k">Ranking is opt-in</span><p><code>weighted_score()</code> only ever runs once a human supplies explicit weights. No default weighting scheme exists anywhere — the value judgement has to be visible and attributable to a person.</p></div>
+      <div class="dcard"><span class="k">Ordering is opt-in</span><p><code>weighted_score()</code> only ever runs once a human supplies explicit weights. No default weighting scheme exists anywhere — the value judgement has to be visible and attributable to a person.</p></div>
     </div>
   </div>
 </section>
@@ -581,7 +581,7 @@ footer{padding:36px 0 60px; color:var(--ink-faint); font-size:13px}
       <table>
         <tr><th>Claim</th><th>Evidence</th><th>Where it lives</th></tr>
         <tr><td>Rankings are statistically real, not noise</td><td>Friedman test on accuracy across 15 CV folds: <code>p = 1.65e-11</code> — average ranks from <code>logistic_regression</code> (best, 1.33) to <code>decision_tree</code> (worst, 6.13), with a critical-difference diagram showing which pairs actually differ</td><td><code>examples/run_phase2_demo.py</code></td></tr>
-        <tr><td>"Best model" isn't a one-dataset anecdote</td><td>480 rows across 10 PMLB datasets; per-family winner computed as a <em>mean</em> across all of them, not one lucky split</td><td><code>ethikit.benchmark.meta</code></td></tr>
+        <tr><td>Family tendencies aren't a one-dataset anecdote</td><td>480 rows across 10 generic PMLB datasets (no sensitive attribute, not per-domain); per-family means across all of them, not one lucky split</td><td><code>ethikit.benchmark.meta</code></td></tr>
         <tr><td>Privacy risk is a real, differentiated signal</td><td>Membership-inference advantage ranged 0.000 (logistic regression) → 0.325 (unconstrained random forest) on identical data — the attack tracks actual overfitting, not noise</td><td><code>examples/run_phase3_demo.py</code></td></tr>
       </table>
     </div>

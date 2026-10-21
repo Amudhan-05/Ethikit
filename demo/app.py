@@ -4,7 +4,7 @@ Run (in Claude Code, after `pip install streamlit`):
     streamlit run demo/app.py
 
 Upload nothing needed -- it uses the built-in datasets. Pick model families,
-choose per-principle weights, and see the leaderboard, radar profile, and
+choose per-principle weights, and see the comparison table, radar profile, and
 Pareto front live. This is the seed of the hosted demo (Hugging Face Spaces
 runs Streamlit apps for free).
 """
@@ -110,7 +110,7 @@ if go:
         obj = obj.sort_values("weighted_score", ascending=False)
         front = pareto_front(objective_matrix(dn))
 
-    st.subheader("Leaderboard")
+    st.subheader("Comparison")
     st.caption(f"Dataset: {ds.name} · sensitive attribute: {ds.sensitive_name}")
     st.dataframe(obj.style.background_gradient(cmap=_GREENS, axis=0), use_container_width=True)
 

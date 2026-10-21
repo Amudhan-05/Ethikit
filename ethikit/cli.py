@@ -162,7 +162,7 @@ def cmd_run(a: argparse.Namespace) -> int:
     if w:
         obj["weighted_score"] = weighted_score(obj, w).round(3)
         obj = obj.sort_values("weighted_score", ascending=False)
-    print("\n" + B("leaderboard") + D("  (0-1 per column, 1 = best in this run)"))
+    print("\n" + B("comparison") + D("  (0-1 per column, 1 = best in this run)"))
     with pd.option_context("display.width", 200, "display.max_columns", 20):
         print(obj.round(3).to_string())
     print("\n" + B("pareto front") + ": " + ", ".join(G(m) for m in s["pareto"]))
