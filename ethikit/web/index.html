@@ -25,19 +25,45 @@
     <div class="term-b">
       <div class="cmd">
         <div class="line first"><span class="flag">ethikit run</span><span class="val dim">evaluate candidate models against the ethics battery</span></div>
-        <div class="line"><span class="flag">--data</span>
+        <div class="line" id="row-mode"><span class="flag">--mode</span>
+          <div class="val">
+            <label class="inl"><input type="radio" name="mode" value="mine" checked> my data &amp; models</label>
+            <label class="inl"><input type="radio" name="mode" value="suite"> reference suite — no data of my own yet</label>
+          </div>
+        </div>
+        <div class="line" id="row-domain" hidden><span class="flag">domains run</span>
+          <div class="val">
+            <select id="domain" aria-label="domain"></select>
+            <span id="domain-strength" class="pill gold"></span>
+            <span id="domain-blurb" class="dim small"></span>
+          </div>
+        </div>
+        <div class="line" id="row-suite-datasets" hidden><span class="flag">datasets</span>
+          <div class="val"><div id="suite-datasets" style="width:100%"></div></div>
+        </div>
+        <div class="line" id="row-suite-opts" hidden><span class="flag">--max-datasets</span>
+          <div class="val">
+            <input type="number" id="max-datasets" min="1" placeholder="all" aria-label="max datasets">
+            <span class="kv"><span>--max-rows</span><input type="number" id="max-rows" value="5000" step="500" min="500"></span>
+            <span class="kv" id="states-wrap"><span>--states</span><input type="text" id="states" value="CA,TX,NY" size="10"></span>
+          </div>
+        </div>
+        <div class="line" id="row-suite-caveats" hidden><span class="flag">caveats</span>
+          <div class="val"><div id="suite-caveats" class="note" style="width:100%"></div></div>
+        </div>
+        <div class="line mine-only"><span class="flag">--data</span>
           <div class="val">
             <select id="data-source" aria-label="dataset"></select>
             <span id="data-desc" class="dim small"></span>
           </div>
         </div>
-        <div class="line" id="row-upload" hidden><span class="flag">your csv</span>
+        <div class="line mine-only" id="row-upload" hidden><span class="flag">your csv</span>
           <div class="val">
             <input type="file" id="csv-file" accept=".csv,text/csv" aria-label="CSV file">
             <span id="csv-info" class="dim small"></span>
           </div>
         </div>
-        <div class="line" id="row-columns" hidden><span class="flag">--target</span>
+        <div class="line mine-only" id="row-columns" hidden><span class="flag">--target</span>
           <div class="val">
             <select id="target" aria-label="target column"></select>
             <span class="flag" style="color:var(--gold)">--sensitive</span>
@@ -47,13 +73,13 @@
             <span class="kv"><span>--sensitive-threshold</span><input type="number" id="sensitive-threshold" placeholder="median" step="any"></span>
           </div>
         </div>
-        <div class="line" id="row-synth" hidden><span class="flag">--synthetic</span>
+        <div class="line mine-only" id="row-synth" hidden><span class="flag">--synthetic</span>
           <div class="val" id="synth-knobs"></div>
         </div>
         <div class="line"><span class="flag">--models</span>
           <div class="val"><div id="models" style="display:grid;gap:4px;width:100%"></div></div>
         </div>
-        <div class="line"><span class="flag">--estimator</span>
+        <div class="line mine-only"><span class="flag">--estimator</span>
           <div class="val">
             <input type="text" id="est-name" placeholder="name" size="10" aria-label="estimator name">
             <span class="dim">=</span>
@@ -62,7 +88,7 @@
             <span id="est-list" class="chips"></span>
           </div>
         </div>
-        <div class="line" id="row-modelfile"><span class="flag">--model-file</span>
+        <div class="line mine-only" id="row-modelfile"><span class="flag">--model-file</span>
           <div class="val">
             <input type="file" id="model-file" accept=".joblib,.pkl,.pickle" aria-label="pre-trained model file">
             <span id="model-file-info" class="dim small">optional: your own pre-trained sklearn-compatible model, evaluated as-is (only load files you trust)</span>
@@ -78,7 +104,8 @@
           <div class="val">
             <input type="number" id="seed" value="0" step="1" aria-label="seed">
             <span class="kv"><span>--test-size</span><input type="number" id="test-size" value="0.3" step="0.05" min="0.1" max="0.6"></span>
-            <label class="inl"><input type="checkbox" id="no-scale"> --no-scale</label>
+            <span class="kv"><span>--cv</span><input type="text" id="cv" size="5" placeholder="off" aria-label="cross-validation, e.g. 5x3"></span>
+            <label class="inl mine-only"><input type="checkbox" id="no-scale"> --no-scale</label>
           </div>
         </div>
       </div>
@@ -115,12 +142,14 @@
       <button role="tab" aria-selected="true" data-tab="results">results</button>
       <button role="tab" aria-selected="false" data-tab="inspect">inspect</button>
       <button role="tab" aria-selected="false" data-tab="card">model-card</button>
+      <button role="tab" aria-selected="false" data-tab="suite">reference-suite</button>
       <button role="tab" aria-selected="false" data-tab="gov">governance</button>
       <span class="right" id="run-label"></span>
     </div>
     <div class="panel" id="tab-results" role="tabpanel"><div class="empty">no run yet</div></div>
     <div class="panel" id="tab-inspect" role="tabpanel" hidden><div class="empty">no run yet</div></div>
     <div class="panel" id="tab-card" role="tabpanel" hidden><div class="empty">no run yet</div></div>
+    <div class="panel" id="tab-suite" role="tabpanel" hidden><div class="empty">no suite run yet — choose <b>--mode reference suite</b> above</div></div>
     <div class="panel" id="tab-gov" role="tabpanel" hidden></div>
   </section>
 </main>

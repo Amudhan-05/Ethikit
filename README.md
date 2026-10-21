@@ -114,6 +114,27 @@ python -m pytest -m e2e           # drives the console in headless Chromium (pla
 - *Port in use:* `python -m ethikit serve --port 9000`.
 - *Loading `--model-file`:* only load files you trust; they are unpickled.
 
+## Reference suites: choosing a starting model before you have data
+
+No data or trained model of your own yet? A **reference suite** runs the same ethics battery over
+several public datasets from one domain and reports which *kinds* of model tend to do well there.
+It is a prior, never a verdict: re-test the shortlist on your own data as soon as you have it.
+
+```bash
+python -m ethikit domains list                       # census, lending, health, justice, hiring (gap)
+python -m ethikit domains info lending               # datasets, sources, sensitive attributes, caveats
+python -m ethikit domains run census --max-datasets 3
+python -m ethikit domains run justice --cv 3x2       # repeated CV: every number gets a spread
+```
+
+or in the console: `--mode reference suite`. You get family-level tables (relative 0-1 scores *and*
+real units such as accuracy and parity gap), whether the leading family also leads on each dataset,
+a Friedman test when there is enough data, and a starting shortlist ("use this shortlist on my
+data"). Suites say how thin they are: `gap` (hiring: bring your own data), `single`, `small`, `suite`.
+Datasets download once and are cached in `~/.cache/ethikit`. The census suite needs
+`pip install folktables`. See [TESTING.md](TESTING.md) (live checks L1-L8) for which loaders have
+been verified against real data.
+
 ## The console and the CLI
 
 `python -m ethikit serve` opens a terminal-style web console (standard library only, no extra
@@ -138,6 +159,7 @@ ethikit run --model-param random_forest.max_depth=5                  # any hyper
 ethikit run --estimator xt=sklearn.ensemble.ExtraTreesClassifier     # any estimator class
 ethikit run --model-file mine=model.joblib --no-scale ...            # your own trained model, as-is
 ethikit run --tool-param robustness.sigma=0.25                       # any tool parameter
+ethikit run --cv 5x3                                                 # repeated k-fold: every score gets a spread
 ethikit list params random_forest | ethikit list tools | ethikit checklist altai
 ```
 

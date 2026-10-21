@@ -7,6 +7,13 @@ import pytest
 warnings.filterwarnings("ignore")
 
 
+@pytest.fixture(autouse=True)
+def _isolated_dataset_cache(tmp_path, monkeypatch):
+    """Every test gets its own empty dataset cache: tests never read or write the user's real
+    ~/.cache/ethikit, and never see another test's cached datasets (ids like "toy1" collide)."""
+    monkeypatch.setenv("ETHIKIT_CACHE", str(tmp_path / "ethikit-cache"))
+
+
 @pytest.fixture(scope="session")
 def tiny_raw():
     from ethikit.data import make_synthetic_raw

@@ -159,6 +159,8 @@ class Handler(BaseHTTPRequestHandler):
                                    "n_features_in": getattr(model, "n_features_in_", None)})
             if url.path == "/api/run":
                 return self._run(json.loads(self._body() or b"{}"))
+            if url.path == "/api/domain-run":
+                return self._domain_run(json.loads(self._body() or b"{}"))
             if url.path.startswith("/api/checklist/"):
                 run_id = url.path.rsplit("/", 1)[1]
                 data = json.loads(self._body() or b"{}")
@@ -189,6 +191,41 @@ class Handler(BaseHTTPRequestHandler):
                                origin=run["prepared"].origins.get(model),
                                checklist=run.get("checklist"))
         self._send(200, html.encode(), "text/html; charset=utf-8")
+
+    def _domain_run(self, cfg: dict):
+        """Stream a reference-suite run: dataset_start / dataset_done / dataset_skip events,
+        then a final `domain_result` (family evidence + shortlist)."""
+        from .domains import get_domains, run_domain, shortlist
+        from .domains.runner import DomainError
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+        def emit(event: dict):
+            self.wfile.write((json.dumps(jsonable(event)) + "\n").encode())
+            self.wfile.flush()
+        try:
+            states = tuple(s for s in (cfg.get("states") or "").replace(" ", "").split(",") if s)
+            domains = get_domains(*([states] if states else []))
+            if cfg.get("domain") not in domains:
+                raise DomainError(f"unknown domain {cfg.get('domain')!r}; choose from {', '.join(domains)}")
+            cv = cfg.get("cv")
+            res = run_domain(domains[cfg["domain"]], models=cfg.get("models") or None,
+                             tools=cfg.get("tools") or None,
+                             max_datasets=int(cfg["max_datasets"]) if cfg.get("max_datasets") else None,
+                             max_rows=int(cfg.get("max_rows") or 5000), seed=int(cfg.get("seed") or 0),
+                             cv=(int(cv[0]), int(cv[1])) if cv else None, on_event=emit)
+            emit({"type": "domain_result", **res.to_dict(), "shortlist": shortlist(res, cfg.get("weights"))})
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        except Exception as exc:
+            try:
+                emit({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
+            except (BrokenPipeError, ConnectionResetError):
+                return
+        self.close_connection = True
 
     def _run(self, config: dict):
         """Stream NDJSON events while the sweep runs, then a final `result`."""

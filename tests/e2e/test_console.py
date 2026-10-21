@@ -117,3 +117,59 @@ def test_phone_width_has_no_sideways_scroll(browser, server):
     pg = ctx.new_page(); pg.goto(server + "/"); pg.wait_for_selector("#models .chip")
     assert pg.evaluate("document.documentElement.scrollWidth") <= 392
     ctx.close()
+
+
+# ------------------------------------------------------------------ M2: reference suites + cv
+def _light_tools(pg):
+    for chip in pg.locator("#tools .chip").all():
+        name = chip.inner_text().split("\n")[0].split(" ")[0].strip()
+        want = name in ("performance", "fairness")
+        cls = chip.get_attribute("class") or ""
+        if ("on" in cls) != want and "off" not in cls:
+            chip.click()
+
+
+def test_suite_mode_hides_my_data_rows_and_rewrites_the_command(page):
+    assert page.locator("#row-domain").is_hidden()
+    page.check("input[name=mode][value=suite]")
+    assert page.locator("#row-domain").is_visible() and page.locator("#row-suite-caveats").is_visible()
+    assert page.locator("#row-modelfile").is_hidden() and page.locator("#data-source").is_hidden()
+    assert page.inner_text("#cmd-preview").startswith("ethikit domains run census")
+    page.select_option("#domain", "hiring")
+    assert "gap" in page.inner_text("#domain-strength")
+    assert page.locator("#run").is_disabled()                          # nothing to run: bring your own data
+    assert "your own" in page.inner_text("#suite-caveats").lower()
+    page.check("input[name=mode][value=mine]")
+    assert page.locator("#data-source").is_visible()
+
+
+def test_suite_run_shows_family_evidence_skips_and_hands_a_shortlist_back(page, monkeypatch):
+    import ethikit.domains as D
+    from tests.test_domain_runner import toy_domain
+    monkeypatch.setattr(D, "get_domains", lambda *a, **k: {"toy": toy_domain(4, bad=(2,))})
+    page.goto(page.url)                                               # reload so /api/meta lists the toy domain
+    page.wait_for_selector("#models .chip")
+    _light_tools(page)
+    page.check("input[name=mode][value=suite]")
+    page.select_option("#domain", "toy")
+    page.click("#run")
+    page.wait_for_selector("#tab-suite table.t", timeout=120000)
+    text = page.inner_text("#tab-suite")
+    assert "family evidence" in text.lower() and "real units" in text.lower() and "caveats" in text.lower()
+    assert "toy caveat" in text and "3 dataset(s) ran" in text and "1 skipped" in text
+    assert page.locator("#suite-datasets .ds-row.skip").count() == 1
+    assert page.locator("#suite-datasets .ds-row.ok").count() == 3
+    page.click("#use-shortlist")
+    assert page.is_checked("input[name=mode][value=mine]")
+    assert page.inner_text("#cmd-preview").startswith("ethikit run")
+    assert not page.errors, page.errors
+
+
+def test_cv_flag_appears_in_the_command_and_the_table_shows_spread(page):
+    _light_tools(page)
+    page.fill("#cv", "3x1")
+    assert "--cv 3x1" in page.inner_text("#cmd-preview")
+    page.click("#run")
+    page.wait_for_function("document.querySelector('#run-label').textContent.length > 0", timeout=120000)
+    assert "±" in page.inner_text("#tab-results table.t")
+    assert not page.errors, page.errors
