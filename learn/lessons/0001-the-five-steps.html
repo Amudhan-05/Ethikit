@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 — The five steps</title>
+<script src="../../ethikit/web/theme.js" data-path="learn/lesson-1" data-nav="none"></script>
+<link rel="stylesheet" href="../assets/learn.css">
+</head>
+<body>
+<main>
+  <div class="kicker">Lesson 1 · about 8 minutes · mission: present the ethikit demo</div>
+  <h1>The five steps</h1>
+  <div class="win"><b>Today's win:</b> say, in order and in one breath, what each of ethikit's five steps does, and why the last step is the point of the project.</div>
+
+  <h2>The idea in one line</h2>
+  <p>ethikit is a <b>model-selection and audit tool</b>. You bring data and candidate models; it measures each model against ethical principles with open-source tools; a human picks — and can show why.</p>
+
+  <h2>The five steps</h2>
+
+  <div class="step"><span class="n">1</span><div>
+    <h3>Frame the decision</h3>
+    <p>You supply a dataset, a target to predict, which column marks the <em>sensitive groups</em> (e.g. sex, or age split at 25), and the candidate models. Everything is one run config — the console's buttons and the <code>ethikit run</code> flags build the same thing.</p>
+    <span class="src">code: ethikit/session.py → prepare()</span></div></div>
+
+  <div class="step"><span class="n">2</span><div>
+    <h3>Train and predict, on <em>your</em> data</h3>
+    <p>Each model is fitted on the training split and asked to predict the held-out test split. Every later tool inspects those predictions or probes the model — so the result belongs to <em>this model on this data</em>, not to the model in the abstract.</p>
+    <span class="src">code: ethikit/benchmark/runner.py → run_benchmark()</span></div></div>
+
+  <div class="step"><span class="n">3</span><div>
+    <h3>Tools, grouped by principle</h3>
+    <p>Each tool is an <code>Evaluator</code> that declares which principle it speaks to (fairness, privacy, safety…) and which part of the system it inspects (data, predictions, internals, behaviour). Several tools can serve one principle — a second opinion. The console's flow graph shows exactly this step happening live.</p>
+    <span class="src">code: ethikit/evaluators/base.py; ethikit/coverage.py</span></div></div>
+
+  <div class="step"><span class="n">4</span><div>
+    <h3>Standardise into a profile</h3>
+    <p>Every metric is rescaled to 0–1 (1 = best <em>among your candidates</em>), then averaged per principle into a profile. The <b>Pareto front</b> keeps the models nobody beats on every principle at once. A single ordering appears only if <em>you</em> give weights.</p>
+    <span class="src">code: ethikit/scoring/aggregate.py</span></div></div>
+
+  <div class="step"><span class="n">5</span><div>
+    <h3>Leave an audit trail</h3>
+    <p>For every number: the formula, the same formula worked with this run's values, the intermediate tables behind it, and the model card. For principles no tool can measure (accountability, human oversight, well-being), you answer a governance checklist and it rides along on the card.</p>
+    <span class="src">code: details["trace"] in each evaluator; ethikit/report/model_card.py; ethikit/checklists.py</span></div></div>
+
+  <div class="note"><b>A limit to say out loud.</b> Step 4's 0–1 scores are <em>relative to the models in your run</em>. They tell you which candidate is better here, not that any is "good enough". That is why step 5 exists.</div>
+
+  <h2>Try it (retrieval practice)</h2>
+  <p>Answer from memory before you scroll up. You will see an explanation after each answer.</p>
+  <div class="quiz" data-id="L1"></div>
+
+  <h2>Do this next (3 minutes)</h2>
+  <p>Open the console (<code>python -m ethikit serve</code>, or the docs site's <a href="../../docs/console/index.html">console replay</a>), press run, and point at where each of the five steps happens on screen. Then click <b>inspect</b> and find one number's formula.</p>
+
+  <h2>Read the one primary source</h2>
+  <p><a href="https://fairlearn.org/v0.9/user_guide/assessment/common_fairness_metrics.html">Fairlearn — Common fairness metrics</a>: it defines demographic parity as the gap between the highest and lowest group selection rates, and warns that achieving it does not by itself mean a classifier is fair. That warning is the reason ethikit shows trade-offs instead of one score.</p>
+
+  <p><i>You are the one steering: ask me anything about these steps, or tell me which one felt thin, and the next lesson goes there.</i></p>
+
+  <nav class="lnk"><a href="../reference/ethikit-five-steps.html">cheat sheet →</a><a href="../RESOURCES.md">resources</a></nav>
+</main>
+<script>
+window.QUIZ = { L1: [
+ { q: "Which step turns a pile of metrics into something a person can choose from?",
+   options: ["Average every metric into one final ethics score",
+             "Scale every metric to 0–1, then compare profiles",
+             "Let each tool vote and keep the majority",
+             "Pick the single highest accuracy and ship it"],
+   answer: 1,
+   why: "Step 4: normalise each metric to 0–1, average per principle, and compare profiles plus the Pareto front. A single averaged score would hide trade-offs." },
+ { q: "Why does ethikit train and test each model on YOUR data instead of rating models in the abstract?",
+   options: ["Training on custom data makes every model run faster",
+             "Abstract ratings would need far more compute than available",
+             "Every library requires a dataset before it can import",
+             "Fairness and robustness depend on data, not model alone"],
+   answer: 3,
+   why: "The same algorithm can be fair on one dataset and biased on another. Explainability and memorisation are closer to inherent; fairness mostly is not." },
+ { q: "In inspect → membership_inference, the member histogram sits far right of the non-member one. What does that mean?",
+   options: ["Outputs reveal which rows were in training data",
+             "Predictions reveal which rows contain missing values here",
+             "Training data was split unevenly between both groups",
+             "Model accuracy dropped after the noise was added"],
+   answer: 0,
+   why: "The attacker uses confidence-in-the-true-class: training rows score higher than unseen rows, so an attacker can tell them apart (Yeom et al., 2018)." },
+ { q: "Which principles do the governance checklists evidence but no tool can measure?",
+   options: ["Fairness, privacy, safety, and explainability",
+             "Accuracy, speed, memory use, latency",
+             "Accountability, human oversight, and well-being",
+             "Robustness, drift, calibration, and overconfidence"],
+   answer: 2,
+   why: "These are process principles. ethikit records checklist answers next to the metrics but never mixes them into model scores." }
+]};
+</script>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>
