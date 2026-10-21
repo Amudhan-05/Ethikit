@@ -20,3 +20,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 The EU ALTAI, Datasheets for Datasets and NIST AI RMF checklists are condensed paraphrases written
 for ethikit, each linking to and citing its original.
+
+## Model Card Toolkit JSON schema
+
+`ethikit/report/schemas/model_card.schema.v0.0.2.json` is the Model Card schema from
+[tensorflow/model-card-toolkit](https://github.com/tensorflow/model-card-toolkit)
+(`model_card_toolkit/schema/v0.0.2/model_card.schema.json` @ 74d7e6d), copyright the TensorFlow
+Authors, used unmodified under the Apache License 2.0
+(https://www.apache.org/licenses/LICENSE-2.0).

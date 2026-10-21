@@ -5,14 +5,10 @@ Toolkit): model details, intended use, quantitative analysis, ethical
 considerations, caveats & recommendations. One card per model, so it can sit
 alongside (or replace) the single aggregate `ethikit_report.html`.
 
-Like the evaluators, this prefers the real `model-card-toolkit` package: when
-it is importable we also populate its `ModelCard` dataclass and export the
-library's own JSON schema as a `.mct.json` sidecar (best-effort -- wrapped so
-any field mismatch across mct versions never blocks the deliverable). As of
-this writing `model-card-toolkit` does not install on Python 3.12 (its
-`absl-py` pin fails to build), the same kind of version constraint noted for
-AIF360 in HANDOFF.md, so the hand-rolled renderer below is what actually
-runs today and needs no optional dependency at all.
+`model-card-toolkit` does not install on Python >= 3.12 (its `absl-py` pin
+fails to build), so the card is rendered here, and the same content is also
+written as `<model>.mct.json` in the toolkit's own JSON schema (mct_json.py),
+so a card can be loaded by MCT-aware tools elsewhere.
 """
 from __future__ import annotations
 
@@ -29,14 +25,6 @@ from .. import coverage as coverage_mod
 from ..evaluators.base import all_evaluators
 from .. import principles as principles_mod
 from ..benchmark.models import family_of, flat_classifiers
-
-
-def _has_mct() -> bool:
-    try:
-        import model_card_toolkit  # noqa: F401
-        return True
-    except Exception:
-        return False
 
 
 def _model_hyperparams(model_name: str) -> Dict[str, str]:
@@ -109,32 +97,6 @@ def _card_data(model_name: str, dataset_name: str, sensitive_name: Optional[str]
                            "hint": ev.install_hint}
                           for ev in all_evaluators() if not ev.available()],
     }
-
-
-def _try_export_mct_json(card: Dict[str, object], out_path: str) -> None:
-    """Best-effort: also populate the real ModelCard dataclass, if installed."""
-    try:
-        from model_card_toolkit import ModelCard
-        from model_card_toolkit.model_card import (
-            Metric, ModelDetails, ModelParameters, PerformanceMetric,
-            QuantitativeAnalysis,
-        )
-
-        mc = ModelCard()
-        mc.model_details = ModelDetails(
-            name=card["model_name"],
-            overview=f"Trained on {card['dataset_name']} (family: {card['family']}).",
-        )
-        mc.quantitative_analysis = QuantitativeAnalysis(
-            performance_metrics=[
-                PerformanceMetric(type=m["metric"], value=str(m["value"]))
-                for m in card["metrics"] if m["value"] is not None
-            ]
-        )
-        with open(out_path, "w") as fh:
-            fh.write(mc.to_json())
-    except Exception:
-        pass  # optional sidecar only -- never block the HTML deliverable on this
 
 
 _STYLE = BASE + """
@@ -374,24 +336,39 @@ governance principles above before deployment.
 </main></body></html>"""
 
 
-def model_card_html(model_name: str, dataset_name: str, raw: pd.DataFrame,
-                    profile: pd.DataFrame, pareto: List[str],
-                    sensitive_name: Optional[str] = None,
-                    hyperparameters: Optional[Dict[str, object]] = None,
-                    origin: Optional[str] = None,
-                    checklist: Optional[dict] = None,
-                    requirements: Optional[dict] = None,
-                    data_profile: Optional[dict] = None) -> str:
-    """One model's card as an HTML string. Traces come from raw.attrs["traces"]
-    (set by run_benchmark); `checklist` is a checklists answers dict; `requirements` is this
-    model's entry from decision.check_requirements (plus the requirement texts); `data_profile`
-    is profile.profile_raw() for the dataset."""
+def _tool_limits() -> Dict[str, str]:
+    return {ev.name: ev.limits for ev in all_evaluators() if getattr(ev, "limits", "")}
+
+
+def build_card(model_name: str, dataset_name: str, raw: pd.DataFrame,
+               profile: pd.DataFrame, pareto: List[str],
+               sensitive_name: Optional[str] = None,
+               hyperparameters: Optional[Dict[str, object]] = None,
+               origin: Optional[str] = None,
+               checklist: Optional[dict] = None,
+               requirements: Optional[dict] = None,
+               data_profile: Optional[dict] = None) -> Dict[str, object]:
+    """The card's content as a dict (rendered to HTML and to Model Card Toolkit JSON).
+    Traces come from raw.attrs["traces"] (set by run_benchmark); `checklist` is a checklists
+    answers dict; `requirements` is this model's entry from decision.check_requirements;
+    `data_profile` is profile.profile_raw() for the dataset."""
     traces = (raw.attrs.get("traces") or {}).get(model_name, {})
     card = _card_data(model_name, dataset_name, sensitive_name, raw, profile.loc[model_name],
                       model_name in pareto, hyperparameters, origin, traces, checklist)
     card["requirements"] = requirements
     card["data_profile"] = data_profile
-    return _render_card_html(card)
+    return card
+
+
+def model_card_html(*args, **kwargs) -> str:
+    """One model's card as an HTML string (same arguments as build_card)."""
+    return _render_card_html(build_card(*args, **kwargs))
+
+
+def model_card_json(*args, **kwargs) -> dict:
+    """One model's card in the Model Card Toolkit JSON schema (same arguments as build_card)."""
+    from .mct_json import card_json
+    return card_json(build_card(*args, **kwargs), _tool_limits())
 
 
 def render_model_cards(dataset_name: str,
@@ -405,26 +382,26 @@ def render_model_cards(dataset_name: str,
                        origins: Optional[Dict[str, str]] = None,
                        requirements: Optional[dict] = None,
                        data_profile: Optional[dict] = None) -> List[str]:
-    """Write one Model Card HTML (+ best-effort .mct.json sidecar) per model.
+    """Write one Model Card per model: <model>.html and <model>.mct.json (Model Card Toolkit schema).
 
     `raw` is the un-normalized run_benchmark() output (has per-metric values and
     `higher_is_better`); `profile` is the principle_profile()/objective_matrix()
     table (model x principle, normalized 0-1) used for the per-principle summary.
     """
+    import json
+    from .mct_json import card_json
     os.makedirs(out_dir, exist_ok=True)
     paths = []
+    limits = _tool_limits()
     for model_name in profile.index:
-        traces = (raw.attrs.get("traces") or {}).get(model_name, {})
-        card = _card_data(model_name, dataset_name, sensitive_name, raw,
-                          profile.loc[model_name], model_name in pareto,
-                          (hyperparameters or {}).get(model_name),
-                          (origins or {}).get(model_name), traces, checklist)
-        card["requirements"] = ((requirements or {}).get("by_model") or {}).get(model_name)
-        card["data_profile"] = data_profile
+        card = build_card(model_name, dataset_name, raw, profile, pareto, sensitive_name,
+                          (hyperparameters or {}).get(model_name), (origins or {}).get(model_name),
+                          checklist, ((requirements or {}).get("by_model") or {}).get(model_name),
+                          data_profile)
         out_path = os.path.join(out_dir, f"{model_name}.html")
         with open(out_path, "w", encoding="utf-8") as fh:
             fh.write(_render_card_html(card))
+        with open(os.path.join(out_dir, f"{model_name}.mct.json"), "w", encoding="utf-8") as fh:
+            json.dump(card_json(card, limits), fh, indent=2)
         paths.append(out_path)
-        if _has_mct():
-            _try_export_mct_json(card, os.path.join(out_dir, f"{model_name}.mct.json"))
     return paths

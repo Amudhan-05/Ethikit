@@ -35,7 +35,7 @@ from . import checklists as checklists_mod
 from . import session
 from .benchmark.models import load_fitted_model
 from .benchmark.runner import jsonable
-from .report import model_card_html, report_html
+from .report import model_card_html, model_card_json, report_html
 
 WEB = Path(__file__).resolve().parent / "web"
 # The docs live beside the package in a source checkout; served at /docs/ so the whole
@@ -125,6 +125,12 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/card/"):
                 _, _, _, run_id, model = path.split("/", 4)
                 return self._card(run_id, model)
+            if path.startswith("/api/card-json/"):
+                _, _, _, run_id, model = path.split("/", 4)
+                args, kwargs = self._card_args(run_id, model)
+                return self._send(200, json.dumps(model_card_json(*args, **kwargs), indent=2).encode(),
+                                  "application/json",
+                                  {"Content-Disposition": f'attachment; filename="{model}.mct.json"'})
             if path == "/api/runs":
                 from .runs import list_runs
                 return self._json({"runs": list_runs()})
@@ -225,17 +231,21 @@ class Handler(BaseHTTPRequestHandler):
             ctype += "; charset=utf-8"
         self._send(200, target.read_bytes(), ctype)
 
-    def _card(self, run_id: str, model: str):
+    @staticmethod
+    def _card_args(run_id: str, model: str):
         run = RUNS[run_id]
         s = run["summary"]
-        html = model_card_html(model, s["dataset"], run["raw"], run["objective"], s["pareto"],
-                               sensitive_name=s["sensitive"],
-                               hyperparameters=run["prepared"].hyperparameters.get(model),
-                               origin=run["prepared"].origins.get(model),
-                               checklist=run.get("checklist"),
-                               requirements=((s.get("requirements") or {}).get("by_model") or {}).get(model),
-                               data_profile=s.get("profile"))
-        self._send(200, html.encode(), "text/html; charset=utf-8")
+        return ((model, s["dataset"], run["raw"], run["objective"], s["pareto"]),
+                dict(sensitive_name=s["sensitive"],
+                     hyperparameters=run["prepared"].hyperparameters.get(model),
+                     origin=run["prepared"].origins.get(model),
+                     checklist=run.get("checklist"),
+                     requirements=((s.get("requirements") or {}).get("by_model") or {}).get(model),
+                     data_profile=s.get("profile")))
+
+    def _card(self, run_id: str, model: str):
+        args, kwargs = self._card_args(run_id, model)
+        self._send(200, model_card_html(*args, **kwargs).encode(), "text/html; charset=utf-8")
 
     def _domain_run(self, cfg: dict):
         """Stream a reference-suite run: dataset_start / dataset_done / dataset_skip events,
