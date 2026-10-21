@@ -105,7 +105,7 @@
  * - ☀ / ☾ buttons pin light / dark; pressing the pinned one again returns to "auto".
  * - The choice is shared by every ethikit page on the same origin (localStorage) and
  *   syncs live across open tabs and into embedded model cards.
- * data-nav="docs" adds the docs links; data-nav="docs" shows only the toggle.
+ * data-nav="docs" adds the docs links; data-nav="none" shows only the toggle.
  *
  * Canonical copy: ethikit/web/theme.js (docs/theme.js is copied by export-site).
  */
@@ -162,16 +162,15 @@
     var nav = script.dataset.nav || "docs";
     var base = script.dataset.base || "";
     if (nav === "console") {
-      // the console is served both from the docs site (docs/console/) and locally by
-      // `ethikit serve`, where the docs aren't -- link to the published docs then.
+      // `ethikit serve` serves the console at / and the docs at /docs/ (all local);
+      // opened straight from disk, the docs are the sibling folder.
       nav = "docs";
-      var onSite = /github\.io$/.test(location.hostname) || location.protocol === "file:";
-      base = onSite ? "../" : "https://amudhan-05.github.io/Ethikit/";
+      base = location.protocol === "file:" ? "../" : "/docs/";
     }
     var b = document.createElement("header");
     b.className = "ek-bar";
     var dots = '<span class="ek-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
-    b.innerHTML = dots + '<span class="ek-path">~/<b>ethikit</b>/' + path + " $</span>";
+    b.innerHTML = dots + '<span class="ek-path">~/<b>ethikit</b>/' + path + " »</span>";
     var n = document.createElement("nav");
     n.className = "ek-nav";
     n.setAttribute("aria-label", "ethikit pages");
@@ -180,6 +179,8 @@
       DOCS.forEach(function (d) {
         var a = document.createElement("a");
         a.href = base + d[0]; a.textContent = d[1];
+        // docs pages served by `ethikit serve` -> the live console at /, not the static replay
+        if (d[0] === "console/" && location.protocol !== "file:" && (location.pathname.indexOf("/docs/") === 0 || base === "/docs/")) a.href = "/";
         if (d[0] === here || (d[0] === "console/" && /\/console\/?/.test(location.pathname))) {
           a.setAttribute("aria-current", "page");
         }
@@ -200,7 +201,7 @@
 body{font-family:var(--font-body);margin:0;color:var(--ink);background:var(--bg);line-height:1.55}
 .page{padding:28px 40px 48px}
 h1{font-family:var(--font-mono);font-weight:600;letter-spacing:-.01em}
-h1::before{content:"$ ";color:var(--accent)}
+h1::before{content:"» ";color:var(--accent)}
 b,strong{color:var(--ink)}
 .sub{color:var(--ink-dim);margin-bottom:28px;font-family:var(--font-mono);font-size:13px}
 h2{text-transform:uppercase;letter-spacing:.08em;color:var(--accent);

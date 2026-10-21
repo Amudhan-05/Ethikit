@@ -380,7 +380,7 @@
     $("#log").innerHTML = ""; LOG_T0 = performance.now();
     $("#run-label").textContent = "";
     if (!S.live) return replay();
-    log("run", "$ " + commandLine().replace(/\s*\\\n\s*/g, " "));
+    log("run", "» " + commandLine().replace(/\s*\\\n\s*/g, " "));
     fetch("api/run", { method: "POST", headers: { "Content-Type": "application/json" },
                        body: JSON.stringify(config()) })
       .then(function (resp) {
@@ -400,7 +400,7 @@
 
   function replay() {
     var rep = S.replay; var evs = rep.events.slice();
-    log("run", "$ " + commandLine().replace(/\s*\\\n\s*/g, " ") + "   # replaying a recorded run");
+    log("run", "» " + commandLine().replace(/\s*\\\n\s*/g, " ") + "   # replaying a recorded run");
     var total = evs.length ? evs[evs.length - 1].t : 1;
     var scale = Math.min(1, 14 / Math.max(total, 0.001));  // compress to ≤ ~14 s
     var i = 0; var start = performance.now();
@@ -770,7 +770,7 @@
     var bar = el("div", { class: "ins-bar" });
     var ms = el("select", { "aria-label": "model" }); models.forEach(function (m) { ms.appendChild(el("option", { value: m }, esc(m))); });
     var ts = el("select", { "aria-label": "tool" });
-    bar.appendChild(el("span", { class: "dim" }, "$ ethikit run … --trace  ·  model"));
+    bar.appendChild(el("span", { class: "dim" }, "» ethikit run … --trace  ·  model"));
     bar.appendChild(ms); bar.appendChild(el("span", { class: "dim" }, "tool")); bar.appendChild(ts);
     box.appendChild(bar);
     var body = el("div"); box.appendChild(body);
@@ -894,7 +894,7 @@
     S.meta.checklists.forEach(function (x) { sel.appendChild(el("option", { value: x.id }, esc(x.name))); });
     sel.value = S.checklistId;
     sel.addEventListener("change", function () { S.checklistId = sel.value; S.answers = {}; save(); renderGov(); update(); });
-    bar.appendChild(el("span", { class: "dim" }, "$ ethikit checklist")); bar.appendChild(sel);
+    bar.appendChild(el("span", { class: "dim" }, "» ethikit checklist")); bar.appendChild(sel);
     var attach = el("button", { class: "btn primary", type: "button" }, "attach to model cards");
     var md = el("button", { class: "btn", type: "button" }, "export .md");
     var js = el("button", { class: "btn", type: "button" }, "export answers .json");
