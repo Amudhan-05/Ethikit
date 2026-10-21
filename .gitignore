@@ -7,3 +7,12 @@ model_cards_test/
 .streamlit/*
 !.streamlit/config.toml
 *.egg-info/
+
+# Personal learning workspace: keep general material (glossary, resources, reference, shared
+# assets) in git, never the lessons or anything specific to the learner.
+learn/lessons/
+learn/learning-records/
+learn/MISSION.md
+learn/NOTES.md
+
+ethikit_out/

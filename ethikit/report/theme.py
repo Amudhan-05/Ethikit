@@ -25,7 +25,7 @@ BASE = """
 body{font-family:var(--font-body);margin:0;color:var(--ink);background:var(--bg);line-height:1.55}
 .page{padding:28px 40px 48px}
 h1{font-family:var(--font-mono);font-weight:600;letter-spacing:-.01em}
-h1::before{content:"$ ";color:var(--accent)}
+h1::before{content:"» ";color:var(--accent)}
 b,strong{color:var(--ink)}
 .sub{color:var(--ink-dim);margin-bottom:28px;font-family:var(--font-mono);font-size:13px}
 h2{text-transform:uppercase;letter-spacing:.08em;color:var(--accent);

@@ -38,6 +38,9 @@ from .benchmark.runner import jsonable
 from .report import model_card_html, report_html
 
 WEB = Path(__file__).resolve().parent / "web"
+# The docs live beside the package in a source checkout; served at /docs/ so the whole
+# project (console + docs) works offline with no hosting. Absent in a plain wheel install.
+DOCS = Path(__file__).resolve().parent.parent / "docs"
 MAX_UPLOAD = 200 * 1024 * 1024
 
 _LOCK = threading.Lock()
@@ -117,6 +120,11 @@ class Handler(BaseHTTPRequestHandler):
                 md = checklists_mod.to_markdown(cl["checklist"], cl.get("answers"))
                 return self._send(200, md.encode(), "text/markdown; charset=utf-8",
                                   {"Content-Disposition": f'attachment; filename="{cl["checklist"]}.md"'})
+            if path == "/docs" or path == "/docs/":
+                return self._static("index.html", DOCS)
+            if path.startswith("/docs/"):
+                rel = path[len("/docs/"):]
+                return self._static(rel + "index.html" if rel.endswith("/") else rel, DOCS)
             return self._static(path.lstrip("/"))
         except KeyError as exc:
             return self._error(exc, 404)
@@ -163,9 +171,9 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             return self._error(exc)
 
-    def _static(self, rel: str):
-        target = (WEB / rel).resolve()
-        if WEB not in target.parents or not target.is_file():
+    def _static(self, rel: str, root: Path = WEB):
+        target = (root / rel).resolve()
+        if root.resolve() not in target.parents or not target.is_file():
             return self._json({"error": f"not found: {rel}"}, 404)
         ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype.endswith("javascript"):

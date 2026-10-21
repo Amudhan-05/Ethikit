@@ -63,16 +63,15 @@
     var nav = script.dataset.nav || "docs";
     var base = script.dataset.base || "";
     if (nav === "console") {
-      // the console is served both from the docs site (docs/console/) and locally by
-      // `ethikit serve`, where the docs aren't -- link to the published docs then.
+      // `ethikit serve` serves the console at / and the docs at /docs/ (all local);
+      // opened straight from disk, the docs are the sibling folder.
       nav = "docs";
-      var onSite = /github\.io$/.test(location.hostname) || location.protocol === "file:";
-      base = onSite ? "../" : "https://amudhan-05.github.io/Ethikit/";
+      base = location.protocol === "file:" ? "../" : "/docs/";
     }
     var b = document.createElement("header");
     b.className = "ek-bar";
     var dots = '<span class="ek-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
-    b.innerHTML = dots + '<span class="ek-path">~/<b>ethikit</b>/' + path + " $</span>";
+    b.innerHTML = dots + '<span class="ek-path">~/<b>ethikit</b>/' + path + " »</span>";
     var n = document.createElement("nav");
     n.className = "ek-nav";
     n.setAttribute("aria-label", "ethikit pages");
@@ -81,6 +80,8 @@
       DOCS.forEach(function (d) {
         var a = document.createElement("a");
         a.href = base + d[0]; a.textContent = d[1];
+        // docs pages served by `ethikit serve` -> the live console at /, not the static replay
+        if (d[0] === "console/" && location.protocol !== "file:" && (location.pathname.indexOf("/docs/") === 0 || base === "/docs/")) a.href = "/";
         if (d[0] === here || (d[0] === "console/" && /\/console\/?/.test(location.pathname))) {
           a.setAttribute("aria-current", "page");
         }

@@ -8,6 +8,8 @@ that best fits their context.
 
 Built around the principle sets published by **UNESCO, Microsoft, IBM, and Google**.
 
+**Where this is going:** see [ROADMAP.md](ROADMAP.md) -- milestones M1-M7 to completion, each with an exit test.
+
 ## What it is -- and isn't
 
 ethikit is a **model-selection and audit tool built on ethical principles**. It is *not* a
@@ -55,26 +57,52 @@ via the Adversarial Robustness Toolbox) instead of random noise; `ethikit.evalua
 runs Alibi Detect's actual statistical drift test against a manufactured distribution
 shift. See `examples/run_phase3_demo.py`.
 
-## Quick start
+## Run it locally
+
+ethikit runs entirely on your machine: no accounts, no hosting, nothing leaves your computer
+(only the optional OpenML datasets, Adult and German Credit, need the network).
+
+**1. Set up** (Python 3.11 or 3.12 recommended; 3.13 works but the drift tool can't install)
 
 ```bash
-pip install -r requirements.txt        # or: pip install -e ".[full,phase2,phase3]"
-python -m ethikit serve --open         # the console: live flow graph, inspect, model cards, checklists
-python -m ethikit run --trace          # the same run in the terminal (see `ethikit run --help`)
-python -m examples.run_demo            # single-dataset demo; runs offline on synthetic data
-streamlit run demo/app.py              # legacy Streamlit UI
-python -m examples.run_phase2_demo     # generalization: CV, significance, meta-benchmark
-python -m examples.run_phase3_demo     # real attacks: membership inference, adversarial, drift
+git clone https://github.com/Amudhan-05/ethikit && cd ethikit
+python3.12 -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements.txt                            # everything, incl. optional tools
+# minimal alternative: pip install -e .                    # scikit-learn only; tools needing
+#                                                          # missing libraries are skipped
 ```
 
-The demo works with **zero network** (synthetic biased dataset) and upgrades to the real
-UCI Adult dataset automatically when online. It also works with **just scikit-learn** --
-every evaluator prefers `fairlearn`/`shap`/`giskard` when installed and falls back to a
-dependency-free implementation when they aren't. `aif360` 0.6.1 now installs on Python
-3.11-3.13 and runs as its own evaluator (disparate impact / 80% rule, equal opportunity,
-average odds, Theil index). `alibi-detect` doesn't build on 3.13 and `model-card-toolkit`
-doesn't build on 3.12+, so **Python 3.11 or 3.12** gives you the fullest battery (see
-`requirements.txt`).
+**2. Start the console** and leave it running
+
+```bash
+python -m ethikit serve --open       # http://127.0.0.1:8765  (--port 9000 to change)
+```
+
+The console is at `/`; the project docs (proposal, internals, field guide, sample report) are
+served by the same command at `/docs/`, so the whole thing works offline.
+
+**3. Or use the terminal**
+
+```bash
+python -m ethikit run --trace                         # synthetic data, every model + tool
+python -m ethikit run --data loans.csv --target approved --sensitive sex
+python -m ethikit list tools | models | datasets | params <name> | checklists
+python -m ethikit checklist deon --out answers.json   # governance checklist template
+```
+
+Outputs go to `./ethikit_out/` (`report.html`, `model_cards/`, `results.json`); that folder is
+disposable. Everything is also pip-installable: `pip install -e .` adds an `ethikit` command.
+
+**Other entry points:** `python -m examples.run_demo` (original single-split demo),
+`run_phase2_demo` (cross-validation + significance; the meta-benchmark part needs
+`pip install pmlb`), `run_phase3_demo` (membership inference, adversarial attack, drift),
+`streamlit run demo/app.py` (older Streamlit UI).
+
+**Troubleshooting**
+- *A tool shows "not installed" in the console:* `pip install` its package (see `requirements.txt`); the rest still run.
+- *`alibi-detect` fails to build:* use Python 3.11/3.12.
+- *Port in use:* `python -m ethikit serve --port 9000`.
+- *Loading `--model-file`:* only load files you trust; they are unpickled.
 
 ## The console and the CLI
 
@@ -103,29 +131,27 @@ ethikit run --tool-param robustness.sigma=0.25                       # any tool 
 ethikit list params random_forest | ethikit list tools | ethikit checklist altai
 ```
 
-The docs site's [console page](https://amudhan-05.github.io/Ethikit/console/) replays a recorded
-real run (GitHub Pages can't run Python); refresh it with `python -m ethikit export-site docs`.
 Everything follows your system light/dark setting, with a ☀/☾ toggle to override it.
 
 ## Docs
 
-**Read them online: https://amudhan-05.github.io/Ethikit/** (GitHub Pages, served from
-[`docs/`](docs/); GitHub's file viewer only shows HTML source, so use these links instead).
+All local. With the console running, open **http://127.0.0.1:8765/docs/**; or open the files in
+[`docs/`](docs/) directly in a browser.
 
 | Page | What it's for |
 |---|---|
-| [Console](https://amudhan-05.github.io/Ethikit/console/) | The console, replaying a recorded run -- the same UI `python -m ethikit serve` gives you locally. |
-| [Project Proposal](https://amudhan-05.github.io/Ethikit/proposal.html) | The original pitch: the problem, the four-body principle taxonomy, and where the project is headed. |
-| [Ethikit Internals](https://amudhan-05.github.io/Ethikit/understanding.html) | The technical companion: every component's mechanism, design rationale, and real-world application angle -- built for learning how and why it's built this way. |
-| [Field Guide](https://amudhan-05.github.io/Ethikit/field-guide.html) | A live-demo script (cue cards, timing, what to say) plus a component reference -- built for presenting ethikit to an audience. |
-| [Sample Report](https://amudhan-05.github.io/Ethikit/report.html) | A real aggregate report from `run_demo.py`. |
+| [Proposal](docs/proposal.html) | The pitch: the problem, the four-body principle taxonomy, and where the project is headed. |
+| [Ethikit Internals](docs/understanding.html) | The technical companion: every component's mechanism and design rationale. |
+| [Field Guide](docs/field-guide.html) | A timed live-demo script plus a component reference, for presenting ethikit. |
+| [Sample Report](docs/report.html) | A real aggregate report from `run_demo.py`. |
+| [Console replay](docs/console/index.html) | A static replay of a recorded run, for when you can't run Python. The live console is `python -m ethikit serve`. |
 
-The source files live in [`docs/`](docs/) and also open directly in a browser if you clone the repo.
+`docs/report.html` is a snapshot generated by `run_demo.py`; refresh the console replay with
+`python -m ethikit export-site docs`.
 
-`docs/report.html` is a point-in-time snapshot of an aggregate report generated by
-`run_demo.py`; regenerate it any time with `python -m examples.run_demo` (the fresh copy
-lands at repo root as `ethikit_report.html`, gitignored -- copy it into `docs/` if you
-want to update the committed snapshot).
+**Teaching material:** `learn/` holds a personal learning workspace. Only general material
+(glossary, resources, reference sheets, shared components) is tracked in git; lessons and
+anything specific to the learner stay local (see `.gitignore`).
 
 ## How it's structured
 
