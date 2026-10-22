@@ -136,7 +136,7 @@ def run_benchmark(dataset: Dataset,
                 trace = next((r.details.get("trace") for r in results
                               if r.details.get("trace")), None)
                 traces[model_name][ev.name] = jsonable({
-                    "trace": trace, "formula": ev.formula,
+                    "trace": trace, "formula": ev.formula, "limits": ev.limits,
                     "params": ev.params(),
                     "mechanisms": sorted({r.mechanism for r in results}),
                 })

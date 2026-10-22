@@ -13,35 +13,58 @@ network at build time to fetch a dataset (the app itself stays offline-capable).
 
 ---
 
-## M1 -- Trust the foundation (tests, CI, honest data)  *(do first; everything else leans on it)*
+## M1 -- Trust the foundation (tests, CI, honest data)  **[DONE]**
 
 | # | Work | Size |
 |---|---|---|
 | 1.1 | `tests/` with pytest: `normalize`, `principle_profile`, `pareto_front`, `weighted_score`; every evaluator on a tiny synthetic dataset (value in range, trace present, `mechanism` non-empty); numpy-fallback vs fairlearn agreement; `prepare_frame` edge cases (NaNs, many-level categoricals, numeric sensitive column, single-class target); checklist scoring | M |
 | 1.2 | Console end-to-end test (Playwright, already used manually): a full run, weights re-order without re-run, inspect shows a formula, checklist attaches to the card | M |
 | 1.3 | Fix the Adult loader: it keeps **numeric columns only** (`loaders.py:154`); add categorical encoding via `prepare_frame` so the headline real dataset is faithful | S |
-| 1.4 | Dependency hygiene: split `requirements.txt` into core / full / dev; document which tools need Python 3.11-3.12 (alibi-detect, model-card-toolkit); make "tool unavailable, here is why" visible in the console and in the model card | S |
+| 1.4 | Dependency hygiene: standardise on Python 3.12 (`.python-version`, README, CI); split `requirements.txt` into core / full / dev; make "tool unavailable, here is why" visible in the console and in the model card | S |
 | 1.5 | GitHub Actions (tests + lint on 3.11/3.12). Local-first is unchanged: CI is only a checker, nothing is deployed | S |
 
-**Exit:** `pytest` green locally and in CI; Adult run uses categorical features; every skipped tool says why.
+**Exit:** `pytest` green locally and in CI on Python 3.12; Adult run uses categorical features; every skipped tool says why.
 
-## M2 -- Per-domain evidence (answers "does domain matter?")  *(HANDOFF Phase 2, finished properly)*
+## M2 -- Reference suites per domain (choose a model *before* you have your own data)  **[BUILT -- live-download check pending]**
 
-Today the meta-benchmark is a generic PMLB sample with **no sensitive attribute**, so fairness
-never runs in it. Fix that.
+**Purpose.** When an organisation has no trained model or labelled data yet, the honest question
+is: "for data like ours, which kind of model tends to do best on the ethics profile, so where
+should we start?" A **reference suite** is a curated set of public datasets from one domain,
+each with a declared target and sensitive attribute, run through the same battery. The result
+is a *prior* (a starting shortlist with evidence), never a verdict -- it has to be re-checked
+on the organisation's own data as soon as that exists. Today's meta-benchmark can't do this: it
+is a generic PMLB sample with **no sensitive attribute**, so fairness never runs in it.
 
 | # | Work | Size |
 |---|---|---|
-| 2.1 | A `domains/` registry: each suite = a domain name, a list of datasets, and for each a declared target, sensitive attribute(s) and positive label. Candidates (availability to verify when built): lending (German Credit, bank marketing, credit card default via fairlearn), income/census (Adult, ACS income), health (hospital readmission via fairlearn `fetch_diabetes_hospital`), criminal-justice (COMPAS, needs a manual CSV), hiring. Datasets that need a manual download get a clear "put the file here" message | L |
-| 2.2 | Domain runner: the same sweep per dataset, results tagged `domain`, aggregated **within** a domain first, then (optionally) across domains; Friedman/Nemenyi within a domain; "does the family ordering change across domains?" as an explicit table | M |
-| 2.3 | Repeated-CV mode in the console and CLI (`--cv 5x3`): every number becomes a mean +/- spread, drawn on the comparison table and radar; weights re-ordering uses means | M |
-| 2.4 | Language audit: "family tendency" claims only appear next to the suite they came from; the field guide's rigor table is regenerated from a real run, not hand-written numbers | S |
+| 2.1 | `domains/` registry: a suite = domain name + datasets, each with target, sensitive attribute(s), positive label, licence/source note. Loaders cache to a local folder; manual-download datasets give a clear "put the file here" message | M |
+| 2.2 | Suites to build (availability checked, see table below) | L |
+| 2.3 | Domain runner: the same sweep per dataset, tagged `domain`/`dataset`, aggregated **within** a domain; Friedman/Nemenyi within a domain; an explicit "does the family ordering change across domains?" table | M |
+| 2.4 | Console + CLI: pick a domain ("I'm a lender"), see the family-level evidence per principle with spread across its datasets, and carry the shortlist into a normal run on your own data. Always shows suite size, datasets and the caveats | M |
+| 2.5 | Repeated-CV mode (`--cv 5x3`) so every number carries a spread; the radar and tables show it | M |
+| 2.6 | Language audit: a family-level claim only ever appears next to the suite it came from; the field guide's rigor table is regenerated from a real run | S |
 
-**Exit:** `ethikit domains run lending` produces per-domain family tables including fairness
-columns; the console can show spread; no doc claims a cross-domain finding the suite can't support.
-*Needs net* to build the suites; results are cached on disk afterwards.
+Candidate suites (what is verified vs. still to check):
 
-## M3 -- Decision support (the "select" half of selection-and-audit)
+| Domain | Datasets | Status |
+|---|---|---|
+| Income / employment / benefits (US census) | folktables ACS tasks: ACSIncome, ACSEmployment, ACSPublicCoverage, ACSMobility, ACSTravelTime, each repeatable over many US states -> a natural multi-dataset suite | tasks verified by search; download of Census PUMS needs network once |
+| Lending / credit | German Credit (OpenML), credit-card default and bank marketing (`fairlearn.datasets`, present locally), Adult | fairlearn loaders confirmed present |
+| Health | hospital readmission (`fairlearn.datasets.fetch_diabetes_hospital`) | loader confirmed present; more health data to find |
+| Criminal justice | COMPAS (race; ProPublica data) | not in fairlearn; manual download, to verify |
+| Education | student-performance style data | proposed in the literature; to verify |
+| Hiring / HR | no standard public benchmark found | **gap**: ship a documented synthetic suite plus "bring your own" |
+
+Honest limits to keep visible in the product: the literature itself questions whether Adult,
+COMPAS and German Credit are good general-purpose fairness benchmarks, and a domain suite is
+only as relevant as its resemblance to *your* population.
+
+**Status:** 2.1 registry, 2.3 runner/aggregation/significance/cross-domain comparison, 2.4 console + CLI (with a shortlist that always weighs utility, and absolute-unit tables beside the relative ones), 2.5 repeated CV (`--cv 5x3`) and 2.6 language audit are built and tested. COMPAS is verified on real data. **Not yet verified:** the census, OpenML and fairlearn downloads (blocked in the build sandbox) -- see TESTING.md L1-L8. **Not done:** regenerating the field guide's rigor table from a fresh run (needs `pip install pmlb` and a network); education and extra health suites (no verified source yet).
+
+**Exit:** `ethikit domains run lending` gives per-domain family tables **with fairness columns**
+and spreads; the console can show them; no doc claims a cross-domain finding the suite can't support.
+
+## M3 -- Decision support (the "select" half of selection-and-audit)  **[BUILT]**
 
 | # | Work | Size |
 |---|---|---|
@@ -54,7 +77,7 @@ columns; the console can show spread; no doc claims a cross-domain finding the s
 **Exit:** a user can state requirements, get the feasible set with reasons, see how fragile the
 pick is, and re-run the exact same audit from a config file.
 
-## M4 -- Tool depth  *(HANDOFF Phase 3, finished)*
+## M4 -- Tool depth  *(HANDOFF Phase 3, finished)*  **[BUILT]**
 
 | # | Work | Size |
 |---|---|---|
@@ -69,19 +92,31 @@ pick is, and re-run the exact same audit from a config file.
 emits a formula, worked steps and an intermediate artefact; mitigation, if present, is
 visibly separate from measurement.
 
-## M5 -- Beyond tabular scikit-learn  *(HANDOFF Phase 4)*
+## M5 -- Deep learning  *(HANDOFF Phase 4, scoped down)*  **[BUILT]**
+
+"Tabular" means data laid out like a spreadsheet: one row per person/loan/case, one column per
+feature (CSV files, database tables). Everything ethikit evaluates today is tabular. Images, text
+and audio are the other kinds. **Scope decision: deep learning on tabular data is in; the LLM
+track is extended work** (below).
 
 | # | Work | Size |
 |---|---|---|
-| 5.1 | Adapter layer: a thin interface so a model is "anything with predict (+ predict_proba)"; PyTorch and Keras wrappers; sklearn `MLPClassifier` and a small PyTorch MLP join the zoo as a deep-learning family | M |
-| 5.2 | Captum attributions (integrated gradients) as the DL explainability tool | M |
-| 5.3 | Text/LLM track (separate dataset type, same principle tags): DeepEval metrics, DeepTeam red-teaming, Giskard LLM scan; local models only (no network calls by default); outputs flow into the same `EvalResult` and the same console | L |
-| 5.4 | Console: a task switch (tabular / text); the flow graph is unchanged because it already draws "tools grouped by principle" from the registry | M |
+| 5.1 | Adapter layer: a model is "anything with predict (+ predict_proba)"; PyTorch and Keras wrappers; an sklearn `MLPClassifier` and a small PyTorch MLP join the zoo as a *deep* family | M |
+| 5.2 | Captum attributions (integrated gradients) as the DL explainability tool, alongside SHAP | M |
+| 5.3 | DP-SGD (Opacus) as an optional "trained with differential privacy" variant of the MLP, so the privacy tool has a real comparison point | M |
+| 5.4 | Console: DL models appear in the model list, with their hyperparameters (layers, learning rate, epochs) in the advanced panel | S |
 
-**Exit:** a small PyTorch model and a local LLM can be audited through the same console, with
-the same principle columns, formulas and model card.
+**Extended work (parked, not in the completion definition).** An LLM track only if both hold:
+the *tool* is open source **and** the *model's internals are exposed* (open-weight model run
+locally, so activations/logits are inspectable and nothing is sent to a third party). Candidates
+to evaluate then: Giskard's LLM scan, DeepEval, DeepTeam (check each for features that need a
+paid or hosted service, which would disqualify them). Closed API models are out of scope.
 
-## M6 -- Reporting and governance completeness
+**Exit:** a small PyTorch MLP and a differentially-private variant are audited through the same
+console with the same principle columns, formulas and model card, and the privacy tool shows a
+measurable difference between them.
+
+## M6 -- Reporting and governance completeness  **[BUILT -- NIST/ALTAI/Datasheets wording check by hand pending]**
 
 | # | Work | Size |
 |---|---|---|
@@ -93,7 +128,7 @@ the same principle columns, formulas and model card.
 
 **Exit:** a reviewer can receive one bundle and reproduce or challenge every number in it.
 
-## M7 -- Finish and polish
+## M7 -- Finish and polish  **[BUILT -- clean-machine rehearsal (TESTING M7.1) is yours]**
 
 | # | Work | Size |
 |---|---|---|
@@ -105,6 +140,11 @@ the same principle columns, formulas and model card.
 **Exit:** a clean clone follows the README to a working demo with no edits.
 
 ---
+
+## Testing
+
+Every milestone has its own automated tests and a hand-checkable visual checklist in
+[TESTING.md](TESTING.md). "Done" means both pass.
 
 ## Order and parallelism
 
@@ -121,8 +161,10 @@ only after M4.6 (the evaluator contract test) so new tool types can't regress ol
 - **Personal learning material stays out of git** (`learn/` keeps only general material).
 - **Every number is traceable**: formula + worked values + intermediate table, or it doesn't ship.
 
-## Decisions I need from you before starting
+## Decisions (settled)
 
-1. **Which domains matter for your project?** (lending / income / health / justice / hiring). M2 builds exactly those first.
-2. **Is a text/LLM track in scope for your project**, or is deep learning on tabular data enough? (M5.3 is the biggest single item.)
-3. **Python version:** are you happy to standardise on 3.12 (everything installs except Model Card Toolkit, which we replace with a JSON export)?
+Settled:
+1. **Domains:** as many as have credible reference suites (see M2); order of build = verified-available first (census, lending, health), then the manual-download ones, then the documented gaps.
+2. **LLM:** extended work only, and only with open-source tools and exposed internals. **Deep learning on tabular data** is in scope.
+3. **Python:** standardise on **3.12** (everything installs except Model Card Toolkit, replaced by a JSON export).
+4. **Testing:** every milestone ships with automated tests *and* a manual/visual checklist; see [TESTING.md](TESTING.md). A milestone is done only when both pass.

@@ -60,6 +60,8 @@ class DriftEvaluator(Evaluator):
         "alone?) and separately measures how much the model's own held-out "
         "performance metric degrades once that shift is present."
     )
+    install_hint = "pip install alibi-detect   (needs Python 3.12 or earlier)"
+    limits = ('A manufactured, uniform shift -- real-world drift is rarely that tidy; Kolmogorov-Smirnov per feature misses shifts in feature relationships.')
     formula = (
         "x_shift = x_test + s ⊙ shift_scale · std_train,   s_j ∈ {−1, +1}\n"
         "per feature j: KS statistic D_j = sup_t |F_ref,j(t) − F_test,j(t)|  → p_j\n"

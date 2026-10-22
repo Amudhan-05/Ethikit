@@ -26,6 +26,7 @@ class PerformanceEvaluator(Evaluator):
         "test set. Not an ethics evaluator -- provides the utility axis every "
         "trade-off in the profile is measured against."
     )
+    limits = ('Measures utility only; says nothing about who bears the errors. A single held-out split (use --cv for a spread).')
     formula = (
         "accuracy = (TP + TN) / n\n"
         "f1 (macro) = mean_c 2·precision_c·recall_c / (precision_c + recall_c)\n"

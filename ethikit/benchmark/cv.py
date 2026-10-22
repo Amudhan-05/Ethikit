@@ -36,7 +36,8 @@ def run_benchmark_cv(raw: RawData,
                      n_splits: int = 5,
                      n_repeats: int = 3,
                      seed: int = 0,
-                     test_size: Optional[float] = None) -> pd.DataFrame:
+                     test_size: Optional[float] = None,
+                     evaluators=None, on_event=None) -> pd.DataFrame:
     """Run the full evaluator battery over `n_repeats` x `n_splits` folds of
     `raw`. Each repeat reshuffles the folds with a different seed (drawn from
     `seed`), so this covers both cross-validation (multiple folds) and
@@ -51,6 +52,7 @@ def run_benchmark_cv(raw: RawData,
     splitter_cls = StratifiedKFold if raw.task == TaskType.CLASSIFICATION else KFold
     rng = np.random.default_rng(seed)
     batches = []
+    traces = {}
 
     for repeat in range(n_repeats):
         fold_seed = int(rng.integers(0, 2**31 - 1))
@@ -58,13 +60,16 @@ def run_benchmark_cv(raw: RawData,
         split_args = (raw.X, raw.y) if raw.task == TaskType.CLASSIFICATION else (raw.X,)
         for fold, (train_idx, test_idx) in enumerate(splitter.split(*split_args)):
             ds = split_dataset(raw, train_idx=train_idx, test_idx=test_idx)
-            batch = run_benchmark(ds, model_factories)
+            batch = run_benchmark(ds, model_factories, evaluators=evaluators, on_event=on_event)
             batch["repeat"] = repeat
             batch["fold"] = fold
             batch["seed"] = fold_seed
             batches.append(batch)
+            traces.update({k: v for k, v in batch.attrs.get("traces", {}).items()})
 
-    return pd.concat(batches, ignore_index=True)
+    out = pd.concat(batches, ignore_index=True)
+    out.attrs["traces"] = traces          # the last fold's traces: enough to show how a number is made
+    return out
 
 
 def score_distribution(cv_raw: pd.DataFrame, metric: str,

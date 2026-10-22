@@ -32,6 +32,11 @@ class Evaluator(ABC):
     #: evaluate() call additionally puts the *same* formula filled in with this
     #: run's numbers into details["trace"] (see make_trace()).
     formula: str = ""
+    #: how to install the optional dependency this tool needs ("" = nothing to install);
+    #: shown in the console, `ethikit list tools` and every model card when the tool is skipped.
+    install_hint: str = ""
+    #: what this tool does NOT measure -- shown next to its numbers so nobody over-reads them.
+    limits: str = ""
 
     def params(self) -> Dict[str, Any]:
         """Tunable knobs: every public scalar attribute set in __init__ (sample

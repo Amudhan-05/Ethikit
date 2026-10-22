@@ -24,6 +24,7 @@ discrete predicted label to flip, which doesn't translate to regression.
 """
 from __future__ import annotations
 
+import contextlib
 from typing import List
 
 import numpy as np
@@ -31,6 +32,27 @@ import numpy as np
 from ..core.types import EvalContext, EvalResult, TaskType
 from ..principles import InspectionTarget
 from .base import Evaluator, make_trace, register
+
+
+@contextlib.contextmanager
+def _seeded_numpy(seed: int):
+    """Make ART's HopSkipJump reproducible. It draws from numpy's global RNG *and* builds an
+    unseeded `np.random.RandomState()` internally, so our own `seed` never reached it. For the
+    duration of the call: seed the global state and make `RandomState()` default to `seed`;
+    both are restored afterwards so nothing else is affected."""
+    saved_state = np.random.get_state()
+    original = np.random.RandomState
+
+    def seeded(s=None):
+        return original(seed if s is None else s)
+
+    np.random.seed(seed)
+    np.random.RandomState = seeded
+    try:
+        yield
+    finally:
+        np.random.RandomState = original
+        np.random.set_state(saved_state)
 
 
 def _has_art() -> bool:
@@ -64,6 +86,8 @@ class ARTRobustnessEvaluator(Evaluator):
         "random-noise stability check with a worst-case, adversarially-"
         "searched one."
     )
+    install_hint = "pip install adversarial-robustness-toolbox"
+    limits = ('A small sample of rows with a tight query budget (see tool parameters): it can miss vulnerabilities a patient attacker would find; L2 perturbations in the scaled feature space only.')
     formula = (
         "for each correctly-classified x: find x' = argmin ‖x' − x‖₂  s.t.  f(x') ≠ f(x)\n"
         "   (HopSkipJump: binary search to the decision boundary + gradient estimate\n"
@@ -114,7 +138,8 @@ class ARTRobustnessEvaluator(Evaluator):
             clf = SklearnClassifier(model=ctx.model, clip_values=(lo, hi))
             atk = HopSkipJump(classifier=clf, max_iter=self.max_iter, max_eval=self.max_eval,
                               init_eval=self.init_eval, init_size=self.init_size, verbose=False)
-            adv = atk.generate(x=Xte[sel])
+            with _seeded_numpy(self.seed):
+                adv = atk.generate(x=Xte[sel])
             adv_pred = ctx.model.predict(adv)
             flipped = adv_pred != base_pred[sel]
             success_rate = float(np.mean(flipped))
@@ -134,7 +159,9 @@ class ARTRobustnessEvaluator(Evaluator):
             f"-> adversarial_robustness = 1 - success_rate = {robustness:.4f}."
         )
         trace = make_trace(
-            steps=[f"adversarial_robustness = 1 − {n_flipped}/{n} = {robustness:.4f}"]
+            steps=[f"attack budget: {n} rows, max_iter={self.max_iter}, max_eval={self.max_eval}, "
+                   f"init_eval={self.init_eval}, init_size={self.init_size} (raise with --tool-param art_robustness.<key>=...)",
+                   f"adversarial_robustness = 1 − {n_flipped}/{n} = {robustness:.4f}"]
                   + ([f"perturbation_size = median(‖x'−x‖₂/√{n_features}) over flipped rows "
                       f"= {median_norm:.4f}"] if median_norm is not None else []),
             tables=[{"title": "Every attacked row (test-set index, did the attack flip it, "

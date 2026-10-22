@@ -21,6 +21,8 @@
     tools: null, toolParams: {}, weights: {},
     result: null, running: false,
     checklistId: "deon", answers: {},
+    mode: "mine", domain: "census", suite: null, suiteDatasets: {},
+    requirements: [], profile: null, historySel: [],
   };
 
   function esc(s) {
@@ -96,7 +98,7 @@
     $("#csv-file").addEventListener("change", uploadCsv);
     $("#model-file").addEventListener("change", uploadModel);
     ["#target", "#sensitive", "#exclude-sensitive", "#positive-label", "#sensitive-threshold",
-     "#seed", "#test-size", "#no-scale"].forEach(function (s) {
+     "#seed", "#test-size", "#no-scale", "#cv", "#max-datasets", "#max-rows", "#states"].forEach(function (s) {
       $(s).addEventListener("input", update);
       $(s).addEventListener("change", update);
     });
@@ -106,12 +108,42 @@
       $("#copy").textContent = "copied"; setTimeout(function () { $("#copy").textContent = "copy"; }, 1200);
     });
     $("#run").addEventListener("click", run);
+    var dl = $("#req-metrics");
+    REQ_METRICS.forEach(function (m) { dl.appendChild(el("option", { value: m + "<=" })); });
+    $("#req-add").addEventListener("click", addRequirement);
+    $("#req-input").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addRequirement(); } });
+    $("#export-config").addEventListener("click", function () {
+      download("ethikit_config.json", JSON.stringify(exportableConfig(), null, 2), "application/json");
+    });
+    $("#import-config").addEventListener("change", importConfig);
+    document.querySelectorAll("input[name=mode]").forEach(function (r) {
+      r.addEventListener("change", function () { if (r.checked) setMode(r.value); });
+    });
+    var dsel = $("#domain");
+    (S.meta.domains || []).forEach(function (d) { dsel.appendChild(el("option", { value: d.id }, esc(d.id) + " — " + esc(d.title))); });
+    dsel.value = S.domain;
+    dsel.addEventListener("change", function () { S.domain = dsel.value; renderDomain(); update(); });
     if (!S.live) {
+      $("#row-mode").hidden = true;
       $("#row-modelfile").hidden = true;
       $("#run").textContent = "▶ replay run";
     }
-    document.querySelectorAll(".tabs button").forEach(function (b) {
+    // WAI-ARIA tabs: arrow keys / Home / End move between tabs, only the selected tab is in the
+    // Tab order, and each panel is labelled by its tab.
+    var tabBtns = Array.prototype.slice.call(document.querySelectorAll(".tabs button"));
+    tabBtns.forEach(function (b, i) {
+      b.id = "tabbtn-" + b.dataset.tab;
+      b.setAttribute("aria-controls", "tab-" + b.dataset.tab);
+      $("#tab-" + b.dataset.tab).setAttribute("aria-labelledby", b.id);
+      b.tabIndex = b.getAttribute("aria-selected") === "true" ? 0 : -1;
       b.addEventListener("click", function () { showTab(b.dataset.tab); });
+      b.addEventListener("keydown", function (e) {
+        var j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabBtns.length - 1 }[e.key];
+        if (j === undefined) return;
+        e.preventDefault();
+        var t = tabBtns[(j + tabBtns.length) % tabBtns.length];
+        showTab(t.dataset.tab); t.focus();
+      });
     });
 
     var saved = load("answers");
@@ -121,11 +153,71 @@
   }
 
   function applyConfig(cfg) {
-    S.source = cfg.data.source; $("#data-source").value = S.source;
-    S.models = new Set(cfg.models.map(function (m) { return m.name; }));
+    var src = (cfg.data || {}).source || "synthetic";
+    if (src === "upload" || src === "csv") {
+      log("skip", "this config used your own CSV" + (cfg.data.path ? " (" + cfg.data.path + ")" : "") +
+          ": choose the file again under --data, then run. Everything else was restored.");
+      src = "csv";
+    }
+    S.source = src; $("#data-source").value = S.source;
+    if (src === "synthetic_custom" && cfg.data.synthetic) S.synth = Object.assign({}, S.meta.synthetic_knobs, cfg.data.synthetic);
+    var models = cfg.models || [];
+    S.models = new Set(models.filter(function (m) { return !m.estimator && !m.file && !m.upload_model_id; }).map(function (m) { return m.name; }));
+    S.modelParams = {};
+    models.forEach(function (m) { if (m.params && Object.keys(m.params).length) S.modelParams[m.name] = Object.assign({}, m.params); });
+    S.estimators = models.filter(function (m) { return m.estimator; }).map(function (m) { return { name: m.name, path: m.estimator }; });
     if (cfg.tools) S.tools = new Set(cfg.tools);
-    S.weights = Object.assign({}, cfg.weights);
-    renderData(); renderModels(); renderTools(); renderWeights(); update();
+    S.toolParams = JSON.parse(JSON.stringify(cfg.tool_params || {}));
+    if (cfg.weights) S.weights = Object.assign({}, cfg.weights);
+    var sp = cfg.split || {};
+    $("#seed").value = sp.seed || 0; $("#test-size").value = sp.test_size || 0.3;
+    $("#no-scale").checked = sp.scale === false; $("#cv").value = sp.cv ? sp.cv[0] + "x" + sp.cv[1] : "";
+    S.requirements = (cfg.requirements || []).map(String);
+    renderData(); renderModels(); renderEstimators(); renderTools(); renderWeights(); renderRequirements(); update();
+  }
+
+  var REQ_METRICS = ["demographic_parity_diff", "equalized_odds_diff", "min_group_selection_rate", "disparate_impact_gap",
+    "abs_equal_opportunity_diff", "abs_average_odds_diff", "theil_index", "membership_inference_advantage",
+    "membership_inference_auc", "perturbation_stability", "adversarial_robustness", "surrogate_fidelity",
+    "accuracy", "f1", "roc_auc"];
+
+  function addRequirement() {
+    var v = $("#req-input").value.trim();
+    if (!/^([\w-]+\.)?[\w-]+\s*(<=|>=|<|>)\s*-?\d+(\.\d*)?$/.test(v)) {
+      $("#req-err").textContent = "write it like demographic_parity_diff<=0.1"; return;
+    }
+    $("#req-err").textContent = ""; $("#req-input").value = "";
+    S.requirements.push(v.replace(/\s+/g, "")); renderRequirements(); update();
+  }
+  function renderRequirements() {
+    var box = $("#req-list"); box.innerHTML = "";
+    S.requirements.forEach(function (r, i) {
+      var c = el("span", { class: "pill gold" }, esc(r) + " ");
+      var x = el("button", { class: "btn", type: "button", "aria-label": "remove requirement " + r }, "×");
+      x.style.padding = "0 5px";
+      x.addEventListener("click", function () { S.requirements.splice(i, 1); renderRequirements(); update(); });
+      c.appendChild(x); box.appendChild(c);
+    });
+  }
+  function exportableConfig() {
+    var c = config();
+    if (c.data.source === "upload") {
+      c.data = { source: "csv", path: (S.upload ? S.upload.name : "your_data") + ".csv", target: c.data.target,
+                 sensitive: c.data.sensitive, exclude_sensitive: c.data.exclude_sensitive,
+                 positive_label: c.data.positive_label, sensitive_threshold: c.data.sensitive_threshold };
+    }
+    c.models = c.models.filter(function (m) { return !m.upload_model_id; });
+    return c;
+  }
+  function importConfig(ev) {
+    var f = ev.target.files[0]; if (!f) return;
+    f.text().then(function (t) {
+      var d = JSON.parse(t); var cfg = d.config || d;
+      if (!cfg.data) throw new Error("not an ethikit config (no 'data' section)");
+      document.querySelector("input[name=mode][value=mine]").checked = true; setMode("mine");
+      applyConfig(cfg); log("ok", "config loaded from " + f.name);
+    }).catch(function (e) { log("err", "import failed: " + e.message); });
+    ev.target.value = "";
   }
 
   // ------------------------------------------------------------------ configure
@@ -200,6 +292,13 @@
           on ? S.models.add(m) : S.models.delete(m); renderAdvanced(); update();
         }));
       });
+      if (fam === "deep" && !isRegression()) {
+        var opt = S.meta.optional_models || {};
+        Object.keys(opt).forEach(function (m) {
+          var c = chip(m, false, true, function () {}, "not installed — " + opt[m]);
+          c.title = "To enable: " + opt[m]; row.appendChild(c);
+        });
+      }
       box.appendChild(row);
     });
     renderAdvanced();
@@ -229,8 +328,8 @@
     S.meta.tools.forEach(function (t) {
       var c = chip(t.name, S.tools.has(t.name), !t.available, function (on) {
         on ? S.tools.add(t.name) : S.tools.delete(t.name); renderAdvanced(); update();
-      }, t.available ? t.principles.join("+") : "not installed");
-      c.title = t.mechanism;
+      }, t.available ? t.principles.join("+") : "not installed — " + (t.install_hint || ""));
+      c.title = t.available ? t.mechanism : "Not installed. To enable: " + (t.install_hint || "see requirements.txt") + "\n\n" + t.mechanism;
       box.appendChild(c);
     });
     renderAdvanced();
@@ -315,13 +414,39 @@
     return {
       data: data,
       split: { test_size: parseFloat($("#test-size").value) || 0.3, seed: parseInt($("#seed").value, 10) || 0,
-               scale: !$("#no-scale").checked },
+               scale: !$("#no-scale").checked, cv: parseCv($("#cv").value) },
       models: models, tools: Array.from(S.tools), tool_params: tp, weights: S.weights,
       checklist: Object.keys(S.answers).length ? { checklist: S.checklistId, answers: S.answers } : null,
+      requirements: S.requirements.slice(),
     };
   }
 
+  function parseCv(v) {
+    var m = /^\s*(\d+)\s*[xX]\s*(\d+)\s*$/.exec(v || "");
+    return m ? [parseInt(m[1], 10), parseInt(m[2], 10)] : null;
+  }
+
+  function suiteConfig() {
+    var cv = parseCv($("#cv").value);
+    return { domain: S.domain, models: Array.from(S.models), tools: Array.from(S.tools),
+             max_datasets: $("#max-datasets").value || null, max_rows: parseInt($("#max-rows").value, 10) || 5000,
+             states: S.domain === "census" ? $("#states").value : null, cv: cv,
+             seed: parseInt($("#seed").value, 10) || 0, weights: S.weights };
+  }
+
   function commandLine() {
+    if (S.mode === "suite") {
+      var sc = suiteConfig(); var p = ["ethikit domains run " + sc.domain];
+      if (sc.models.length) p.push("--models " + sc.models.join(","));
+      var avail = S.meta.tools.filter(function (t) { return t.available; }).map(function (t) { return t.name; });
+      if (S.tools.size !== avail.length) p.push("--tools " + Array.from(S.tools).join(","));
+      if (sc.max_datasets) p.push("--max-datasets " + sc.max_datasets);
+      if (sc.max_rows !== 5000) p.push("--max-rows " + sc.max_rows);
+      if (sc.states && sc.states !== "CA,TX,NY") p.push("--states " + sc.states);
+      if (sc.cv) p.push("--cv " + sc.cv[0] + "x" + sc.cv[1]);
+      if (sc.seed) p.push("--seed " + sc.seed);
+      return p.join(" \\\n    ");
+    }
     var c = config(); var parts = ["ethikit run"];
     if (S.source === "csv") {
       parts.push("--data " + ((S.upload && S.upload.name) || "your_data") + ".csv");
@@ -351,15 +476,19 @@
     if (c.split.seed !== 0) parts.push("--seed " + c.split.seed);
     if (c.split.test_size !== 0.3) parts.push("--test-size " + c.split.test_size);
     if (!c.split.scale) parts.push("--no-scale");
+    if (c.split.cv) parts.push("--cv " + c.split.cv[0] + "x" + c.split.cv[1]);
     if (c.checklist) parts.push("--checklist " + S.checklistId + "_answers.json");
+    S.requirements.forEach(function (r) { parts.push('--require "' + r + '"'); });
     return parts.join(" \\\n    ");
   }
   function quote(v) { return /[\s'"(),]/.test(v) ? '"' + String(v).replace(/"/g, '\\"') + '"' : v; }
 
   function update() {
     $("#cmd-preview").textContent = commandLine();
-    var ok = S.models.size + S.estimators.length + (S.modelFile ? 1 : 0) > 0 && S.tools.size > 0 &&
-             (S.source !== "csv" || (S.upload && $("#target").value));
+    var ok = S.mode === "suite"
+      ? S.models.size > 0 && S.tools.size > 0 && domainInfo() && domainInfo().datasets.length > 0
+      : S.models.size + S.estimators.length + (S.modelFile ? 1 : 0) > 0 && S.tools.size > 0 &&
+        (S.source !== "csv" || (S.upload && $("#target").value));
     $("#run").disabled = S.running || !ok;
   }
 
@@ -380,6 +509,7 @@
     $("#log").innerHTML = ""; LOG_T0 = performance.now();
     $("#run-label").textContent = "";
     if (!S.live) return replay();
+    if (S.mode === "suite") return runSuite();
     log("run", "» " + commandLine().replace(/\s*\\\n\s*/g, " "));
     fetch("api/run", { method: "POST", headers: { "Content-Type": "application/json" },
                        body: JSON.stringify(config()) })
@@ -424,6 +554,10 @@
   function onEvent(e) {
     switch (e.type) {
       case "prepare": log("run", "preparing data + models (run " + e.run_id + ")"); break;
+      case "profile":
+        S.profile = e; renderProfile();
+        (e.warnings || []).forEach(function (w) { log("skip", "data  ! " + w); });
+        break;
       case "note": log("skip", "note: " + e.message); break;
       case "run_start":
         G = buildGraph(e);
@@ -450,13 +584,14 @@
       case "tool_error":
         log("err", "  ✗   " + e.tool + " → " + e.model + ": " + e.error);
         G && G.toolError(e.model, e.tool); break;
+      case "cv_fold": $("#prog-text").textContent = "cross-validation fold " + e.i + " / " + e.n; break;
       case "run_done": log("ok", "done  " + e.n_records + " measurements"); break;
       case "error": log("err", "error " + e.error); break;
       case "result":
         S.result = e;
         $("#run-label").textContent = e.dataset + " · " + Object.keys(e.objective).length + " models";
         G && G.final(e);
-        renderResults(); renderInspect(); renderCardTab();
+        renderResults(); renderInspect(); renderCardTab(); renderDatasheet(); if (S.live) renderHistory();
         log("ok", "pareto front: " + e.pareto.join(", "));
         break;
     }
@@ -696,7 +831,10 @@
     models.forEach(function (m) {
       var s = 0; for (var p in w) s += (r.objective[m][p] || 0) * w[p] / (wsum || 1); score[m] = s;
     });
-    models.sort(function (a, b) { return score[b] - score[a]; });
+    var req = r.requirements;
+    function ok(m) { return !req || (req.by_model[m] && req.by_model[m].passes); }
+    // models that meet your requirements come first; within each group, by weighted score
+    models.sort(function (a, b) { return (ok(b) - ok(a)) || (score[b] - score[a]); });
     return { models: models, cols: cols, score: score, wsum: wsum };
   }
   function colourIndex(m) { return Object.keys(S.result.objective).indexOf(m) % 10; }
@@ -705,11 +843,14 @@
     var r = S.result; var sc = scored();
     var box = $("#tab-results"); box.innerHTML = "";
     var head = "<tr><th>model</th><th>family</th>" + sc.cols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") +
-      "<th>weighted</th><th>pareto</th></tr>";
+      "<th>weighted</th><th>pareto</th>" + (r.requirements ? "<th>requirements</th>" : "") + "</tr>";
     var rows = sc.models.map(function (m) {
-      return "<tr><td><span class='sw s" + colourIndex(m) + "'></span> " + esc(m) + "</td><td class='l dim'>" + esc(r.families[m] || "custom") + "</td>" +
-        sc.cols.map(function (c) { var v = r.objective[m][c]; return "<td class='heat' style='--h:" + (v || 0) + "'>" + fmt(v) + "</td>"; }).join("") +
-        "<td><b>" + fmt(sc.score[m]) + "</b></td><td>" + (r.pareto.indexOf(m) >= 0 ? "<span class='pill'>front</span>" : "<span class='dim'>–</span>") + "</td></tr>";
+      var failing = r.requirements && !r.requirements.by_model[m].passes;
+      return "<tr" + (failing ? " class='excluded' title='fails a requirement you set'" : "") + "><td><span class='sw s" + colourIndex(m) + "'></span> " + esc(m) + "</td><td class='l dim'>" + esc(r.families[m] || "custom") + "</td>" +
+        sc.cols.map(function (c) { var v = r.objective[m][c]; var sd = r.objective_std && r.objective_std[m] ? r.objective_std[m][c] : null;
+          return "<td class='heat' style='--h:" + (v || 0) + "'>" + fmt(v) + (sd != null ? " <span class='dim'>±" + sd.toFixed(2) + "</span>" : "") + "</td>"; }).join("") +
+        "<td><b>" + fmt(sc.score[m]) + "</b></td><td>" + (r.pareto.indexOf(m) >= 0 ? "<span class='pill'>front</span>" : "<span class='dim'>–</span>") + "</td>" +
+        (r.requirements ? "<td>" + (r.requirements.by_model[m].passes ? "<span class='pill'>meets</span>" : "<span class='pill red'>fails</span>") + "</td>" : "") + "</tr>";
     }).join("");
     var wtxt = Object.keys(S.weights).filter(function (p) { return S.weights[p] > 0; }).map(function (p) { return p + "=" + S.weights[p]; }).join(", ");
     box.innerHTML =
@@ -721,9 +862,119 @@
       "<div>" + r.pareto.map(function (m) { return "<span class='pill'>" + esc(m) + "</span>"; }).join("") + "</div>" +
       "<div class='note'>Scores are relative to this dataset and this split. The same model can score differently on other data — try <code>--synthetic minority_share=0.15</code> or your own CSV, or vary <code>--seed</code>.</div>" +
       (r.notes || []).map(function (n) { return "<div class='note'>" + esc(n) + "</div>"; }).join("") +
-      (S.live ? "<p style='margin-top:12px'><a class='btn' href='api/report/" + esc(r.run_id) + "' target='_blank' rel='noopener'>open aggregate report ↗</a></p>" : "") +
+      requirementsHtml(r) + stabilityHtml(r) + (S.live && r.task === "classification" ? whatifHtml(r) : "") +
+      (S.live ? "<p style='margin-top:12px'><a class='btn' href='api/report/" + esc(r.run_id) + "' target='_blank' rel='noopener'>open aggregate report ↗</a> " +
+        "<a class='btn primary' id='bundle-dl' href='api/bundle/" + esc(r.run_id) + "' download='ethikit_bundle.zip'>export audit bundle (.zip)</a></p>" +
+        "<p class='dim small'>One zip a reviewer can use to reproduce or challenge every number: config, results, metrics.csv, traces, report, model cards (+ Model Card Toolkit JSON), datasheet, checklist answers, a README and checksums. Check it with <code>ethikit bundle verify ethikit_bundle.zip</code>.</p>" : "") +
       "</div></div>";
     radar($("#radar"), sc);
+    if ($("#wi-run")) $("#wi-run").addEventListener("click", runWhatif);
+  }
+
+  function requirementsHtml(r) {
+    var q = r.requirements; if (!q) return "";
+    var failing = Object.keys(q.by_model).filter(function (m) { return !q.by_model[m].passes; });
+    return "<h3 style='margin-top:14px'>requirements</h3><p class='prose'>" + q.list.map(function (t) { return "<code>" + esc(t) + "</code>"; }).join(" · ") +
+      " — checked on raw values. Feasible: " + (q.feasible.length ? q.feasible.map(function (m) { return "<span class='pill'>" + esc(m) + "</span>"; }).join("") : "<b class='err'>none — relax a requirement</b>") + "</p>" +
+      (failing.length ? "<div class='note'><b>excluded, and why</b>" + failing.map(function (m) {
+        return "<div>" + esc(m) + ": " + q.by_model[m].results.filter(function (x) { return !x.passes; }).map(function (x) { return esc(x.requirement) + " — " + esc(x.reason); }).join("; ") + "</div>"; }).join("") + "</div>" : "");
+  }
+  function stabilityHtml(r) {
+    var s = r.stability; if (!s) return "";
+    if (!s.available) return "<h3 style='margin-top:14px'>how stable is the order?</h3><p class='dim small'>" + esc(s.reason) + "</p>";
+    return "<h3 style='margin-top:14px'>how stable is the order?</h3><p class='prose'>Under your weights <b>" + esc(s.first) + "</b> comes first" +
+      (r.requirements ? " among the feasible models" : "") + "; <b>" + Math.round(100 * s.nearby_weights_keep_first) + "%</b> of nearby weight settings keep it first" +
+      (Object.keys(s.main_rivals).length ? " (otherwise " + Object.keys(s.main_rivals).map(esc).join(", ") + ")" : "") + ".</p>" +
+      "<ul class='prose small'>" + Object.keys(s.per_principle).map(function (p) { return "<li>" + esc(s.per_principle[p].sentence) + "</li>"; }).join("") + "</ul>" +
+      "<p class='dim small'>Note: these weights re-order without re-running; the stability above was computed for the weights you ran with.</p>";
+  }
+
+  function renderProfile() {
+    var p = S.profile; var box = $("#tab-data"); if (!p) return;
+    var g = (p.groups || []).map(function (x) { return "<tr><td>" + esc(x.group) + "</td><td>" + x.n + "</td><td>" + fmt(x.share) + "</td><td>" + fmt(x.base_rate != null ? x.base_rate : x.mean_target) + "</td></tr>"; }).join("");
+    var px = p.proxy || {};
+    var top = (px.top_features || []).map(function (f) { return "<tr><td>" + esc(f.feature) + "</td><td>" + fmt(f.mutual_information) + "</td></tr>"; }).join("");
+    var miss = (p.missing || []).map(function (m) { return "<tr><td>" + esc(m.column) + "</td><td>" + (100 * m.share_missing).toFixed(1) + "%</td></tr>"; }).join("");
+    box.innerHTML = "<h3>what the data says, before any model</h3><p class='prose'>" + p.n_rows + " rows · " + p.n_features + " features · sensitive attribute <b>" + esc(p.sensitive || "none") + "</b>" +
+      (p.positive_rate != null ? " · positive rate " + fmt(p.positive_rate) : "") + "</p>" +
+      ((p.warnings || []).length ? "<div class='note'>" + p.warnings.map(function (w) { return "<div>! " + esc(w) + "</div>"; }).join("") + "</div>" : "<p class='ok small'>no data-level warnings</p>") +
+      "<div class='ins-grid' style='margin-top:12px'><div><h3>groups</h3><div class='tscroll'><table class='t'><tr><th>group</th><th>rows</th><th>share</th><th>base rate</th></tr>" + g + "</table></div></div>" +
+      "<div><h3>proxy screen</h3><p class='prose small'>" + (px.auc != null ? "Other features predict the sensitive attribute with <b>AUC " + fmt(px.auc) + "</b> (0.5 = no information). " + esc(px.method || "") : esc(px.reason || "not available")) + "</p>" +
+      (top ? "<div class='tscroll'><table class='t'><tr><th>feature</th><th>mutual information</th></tr>" + top + "</table></div>" : "") +
+      (miss ? "<h3 style='margin-top:12px'>missing before imputation</h3><div class='tscroll'><table class='t'><tr><th>column</th><th>missing</th></tr>" + miss + "</table></div>" : "") + "</div></div>";
+  }
+
+  // datasheet (Gebru et al.): pre-filled by the server from the profile; open questions are yours
+  function renderDatasheet() {
+    var box = $("#tab-data"); var r = S.result;
+    var old = $("#datasheet"); if (old) old.remove();
+    if (!S.live || !r || !r.run_id) return;
+    var sec = el("div", { id: "datasheet" });
+    box.appendChild(sec);
+    var base = "api/datasheet/" + encodeURIComponent(r.run_id);
+    fetch(base).then(function (x) { return x.json(); }).then(draw)
+      .catch(function (e) { sec.innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+    function draw(sheet) {
+      if (sheet.error) { sec.innerHTML = "<p class='err'>" + esc(sheet.error) + "</p>"; return; }
+      var done = sheet.items.filter(function (i) { return i.answer; }).length;
+      var h = "<h3 style='margin-top:18px'>datasheet for the dataset</h3><p class='prose'>After " + esc(sheet.after) +
+        ". ethikit filled in <b>" + done + " of " + sheet.items.length + "</b> questions from the data and the run; the rest only the people who made or chose the data can answer. " +
+        "Your answers go into the datasheet, the audit bundle and nowhere else.</p>" +
+        "<div class='ins-bar'><button class='btn primary' type='button' id='ds-save'>save answers</button>" +
+        "<a class='btn' href='" + base + "?format=html' target='_blank' rel='noopener'>open ↗</a>" +
+        "<a class='btn' href='" + base + "?format=md' download='datasheet.md'>download .md</a><span class='dim small' id='ds-status'></span></div>";
+      var secName = null;
+      sheet.items.forEach(function (i) {
+        if (i.section !== secName) { secName = i.section; h += "<div class='gsec'>" + esc(secName) + "</div>"; }
+        h += "<div class='ds-q'><div class='q'>" + esc(i.question) + " <span class='dim small'>" + esc(i.id) + "</span></div>" +
+          (i.answer && i.filled_by !== "you" ? "<div class='prose small'>" + esc(i.answer) + "</div><div class='dim small'>filled by " + esc(i.filled_by) + "</div>"
+            : "<textarea rows='2' data-q='" + esc(i.id) + "' aria-label='" + esc(i.question) + "' placeholder='yours to answer'>" + esc(i.answer || "") + "</textarea>") + "</div>";
+      });
+      sec.innerHTML = h;
+      $("#ds-save").addEventListener("click", function () {
+        var answers = {};
+        sec.querySelectorAll("textarea[data-q]").forEach(function (t) { if (t.value.trim()) answers[t.getAttribute("data-q")] = t.value; });
+        fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: answers }) })
+          .then(function (x) { return x.json(); }).then(function (res) {
+            if (res.error) throw new Error(res.error);
+            $("#ds-status").innerHTML = "<span class='ok'>✓ saved</span> — included in the audit bundle";
+          }).catch(function (e) { $("#ds-status").innerHTML = "<span class='err'>" + esc(e.message) + "</span>"; });
+      });
+    }
+  }
+
+  function renderHistory() {
+    var box = $("#tab-history");
+    if (!S.live) { box.innerHTML = "<div class='empty'>run history is kept by the local console (python -m ethikit serve)</div>"; return; }
+    fetch("api/runs").then(function (r) { return r.json(); }).then(function (d) {
+      var runs = d.runs || []; S.historySel = [];
+      box.innerHTML = "<h3>saved runs</h3><p class='prose small'>Every run is saved locally under <code>ethikit_runs/</code>. Tick two to compare, or load one's config to re-run it exactly.</p>" +
+        (runs.length ? "<div class='tscroll'><table class='t'><tr><th></th><th>run</th><th>dataset</th><th>models</th><th>cv</th><th></th></tr>" + runs.map(function (x) {
+          return "<tr><td><input type='checkbox' class='hsel' value='" + esc(x.run_id) + "' aria-label='select " + esc(x.run_id) + "'></td><td>" + esc(x.run_id) + "</td><td class='l'>" + esc(x.dataset) + "</td><td class='l'>" + esc((x.models || []).join(", ")) + "</td><td>" + (x.cv ? x.cv.join("x") : "–") + "</td><td><button class='btn hload' data-id='" + esc(x.run_id) + "' type='button'>load config</button></td></tr>"; }).join("") + "</table></div>" +
+          "<p style='margin-top:10px'><button class='btn primary' id='hdiff' type='button' disabled>compare selected</button></p><div id='hdiff-out'></div>" : "<div class='empty'>no saved runs yet</div>");
+      box.querySelectorAll(".hsel").forEach(function (c) { c.addEventListener("change", function () {
+        S.historySel = Array.from(box.querySelectorAll(".hsel:checked")).map(function (x) { return x.value; });
+        var b = $("#hdiff"); if (b) b.disabled = S.historySel.length !== 2; }); });
+      box.querySelectorAll(".hload").forEach(function (b) { b.addEventListener("click", function () {
+        fetch("api/runs/" + encodeURIComponent(b.dataset.id)).then(function (r) { return r.json(); }).then(function (run) {
+          document.querySelector("input[name=mode][value=mine]").checked = true; setMode("mine");
+          applyConfig(run.config); window.scrollTo({ top: 0, behavior: "smooth" }); log("ok", "config of " + b.dataset.id + " loaded — press run to reproduce it");
+        }); }); });
+      var hd = $("#hdiff"); if (hd) hd.addEventListener("click", function () {
+        fetch("api/runs-diff?a=" + encodeURIComponent(S.historySel[1]) + "&b=" + encodeURIComponent(S.historySel[0])).then(function (r) { return r.json(); }).then(renderDiff); });
+    }).catch(function () { box.innerHTML = "<div class='empty'>could not load run history</div>"; });
+  }
+  function renderDiff(d) {
+    var out = $("#hdiff-out");
+    if (d.error) { out.innerHTML = "<div class='note'>" + esc(d.error) + "</div>"; return; }
+    if (d.identical) { out.innerHTML = "<p class='ok'>identical: same config, same scores, same metrics</p>"; return; }
+    function tbl(rows, cols) { return "<div class='tscroll'><table class='t'><tr>" + cols.map(function (c) { return "<th>" + c + "</th>"; }).join("") + "</tr>" +
+      rows.map(function (r) { return "<tr>" + cols.map(function (c) { var v = r[c]; return "<td" + (c === "delta" && v ? " class='" + (v > 0 ? "ok" : "err") + "'" : "") + ">" + esc(v == null ? "–" : typeof v === "number" ? fmt(v) : v) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>"; }
+    out.innerHTML = "<h3>what changed: " + esc(d.a.run_id) + " → " + esc(d.b.run_id) + "</h3>" +
+      "<h3>config</h3>" + tbl(d.config_changes, ["key", "a", "b"]) +
+      "<h3>scores (0–1)</h3>" + tbl(d.score_changes, ["model", "principle", "a", "b", "delta"]) +
+      "<h3>raw metrics</h3>" + tbl(d.metric_changes.slice(0, 60), ["model", "tool", "metric", "a", "b", "delta"]) +
+      "<p class='prose small'>pareto front: " + esc((d.pareto_a || []).join(", ")) + " → " + esc((d.pareto_b || []).join(", ")) + "</p>";
   }
 
   function radar(box, sc) {
@@ -778,9 +1029,56 @@
       ts.innerHTML = ""; Object.keys(r.traces[ms.value] || {}).forEach(function (t) { ts.appendChild(el("option", { value: t }, esc(t))); });
       show();
     }
-    function show() { body.innerHTML = ""; body.appendChild(inspectView(ms.value, ts.value)); }
+    function show() { body.innerHTML = ""; body.appendChild(inspectView(ms.value, ts.value)); if (S.live) body.appendChild(rowExplainer(ms.value)); }
     ms.addEventListener("change", fillTools); ts.addEventListener("change", show);
     if (models.length) fillTools(); else body.innerHTML = "<div class='empty'>no traces</div>";
+  }
+
+  function rowExplainer(model) {
+    var d = el("div", { class: "block", style: "margin-top:18px;border-top:1px dashed var(--rule);padding-top:12px" },
+      "<h3>why this one row? (local explanation)</h3><p class='dim small'>Each feature in turn is set to its training mean; the bar is how far " +
+      "the score moves. One feature at a time, so interactions are missed.</p>");
+    var bar = el("div", { class: "ins-bar" });
+    var inp = el("input", { type: "number", min: "0", value: "0", "aria-label": "test row index" });
+    var go = el("button", { class: "btn", type: "button" }, "explain row");
+    var out = el("div");
+    bar.appendChild(el("span", { class: "dim" }, "» ethikit explain --models " + esc(model) + " --row"));
+    bar.appendChild(inp); bar.appendChild(go); d.appendChild(bar); d.appendChild(out);
+    go.addEventListener("click", function () {
+      out.innerHTML = "<span class='dim'>explaining…</span>";
+      fetch("api/explain/" + encodeURIComponent(S.result.run_id) + "/" + encodeURIComponent(model) + "?row=" + (parseInt(inp.value, 10) || 0))
+        .then(function (r) { return r.json(); }).then(function (e) {
+          if (e.error) { out.innerHTML = "<div class='note'>" + esc(e.error) + "</div>"; return; }
+          out.innerHTML = "<p class='prose'>Score <b>" + fmt(e.score) + "</b> (" + esc(e.score_meaning) + ") · predicted " + esc(e.prediction) +
+            " · actual " + esc(e.actual) + (e.group != null ? " · group " + esc(e.group) : "") + "</p>";
+          out.appendChild(chart({ title: "contribution to this row's score", type: "bars",
+            labels: e.contributions.map(function (c) { return c.feature; }),
+            series: [{ name: "contribution", values: e.contributions.map(function (c) { return c.contribution; }) }] }));
+        }).catch(function (err) { out.innerHTML = "<div class='note'>" + esc(err.message) + "</div>"; });
+    });
+    return d;
+  }
+
+  function whatifHtml(r) {
+    var models = Object.keys(r.objective);
+    return "<h3 style='margin-top:14px'>what if we mitigate? <span class='pill gold'>counterfactual — not part of the audit</span></h3>" +
+      "<p class='prose small'>Trains a fairness-constrained version of one model with fairlearn and shows the cost. Nothing here changes any score above.</p>" +
+      "<div class='ins-bar'><select id='wi-model' aria-label='model'>" + models.map(function (m) { return "<option>" + esc(m) + "</option>"; }).join("") + "</select>" +
+      "<select id='wi-method' aria-label='method'><option value='exponentiated_gradient'>exponentiated gradient (retrain)</option><option value='threshold_optimizer'>threshold optimizer (post-process)</option></select>" +
+      "<select id='wi-constraint' aria-label='constraint'><option value='demographic_parity'>demographic parity</option><option value='equalized_odds'>equalized odds</option></select>" +
+      "<button class='btn' id='wi-run' type='button'>run what-if</button></div><div id='wi-out'></div>";
+  }
+  function runWhatif() {
+    var out = $("#wi-out"); out.innerHTML = "<span class='dim'>training the constrained model…</span>";
+    fetch("api/whatif", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: S.result.run_id, model: $("#wi-model").value, method: $("#wi-method").value, constraint: $("#wi-constraint").value }) })
+      .then(function (r) { return r.json(); }).then(function (w) {
+        if (w.error) { out.innerHTML = "<div class='note'>" + esc(w.error) + "</div>"; return; }
+        var rows = Object.keys(w.before).map(function (k) { var d = w.delta[k]; var better = /diff/.test(k) ? d < 0 : d > 0;
+          return "<tr><td>" + esc(k) + "</td><td>" + fmt(w.before[k]) + "</td><td>" + fmt(w.after[k]) + "</td><td class='" + (d === 0 ? "" : better ? "ok" : "err") + "'>" + (d > 0 ? "+" : "") + fmt(d) + "</td></tr>"; }).join("");
+        out.innerHTML = "<p class='prose'>" + esc(w.summary) + "</p><div class='tscroll'><table class='t'><tr><th>metric</th><th>before</th><th>after</th><th>change</th></tr>" + rows + "</table></div>" +
+          "<div class='note'><div>uses the sensitive attribute " + esc(w.uses_sensitive_attribute) + "</div>" + w.caveats.map(function (c) { return "<div>! " + esc(c) + "</div>"; }).join("") + "</div>";
+      }).catch(function (e) { out.innerHTML = "<div class='note'>" + esc(e.message) + "</div>"; });
   }
 
   function inspectView(model, tool) {
@@ -792,6 +1090,7 @@
     left.innerHTML =
       "<div class='block'><h3>what it does</h3><p class='prose'>" + esc(meta.mechanism || "") + "</p></div>" +
       "<div class='block'><h3>the maths</h3><pre class='code'>" + esc(tr.formula || meta.formula || "") + "</pre></div>" +
+      ((tr.limits || meta.limits) ? "<div class='block'><h3>what this does not measure</h3><div class='note'>" + esc(tr.limits || meta.limits) + "</div></div>" : "") +
       (t.steps && t.steps.length ? "<div class='block'><h3>worked through, this run</h3><ol class='steps'>" +
         t.steps.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ol></div>" : "") +
       "<div class='block'><h3>measurements</h3><div class='tscroll'><table class='t'><tr><th>metric</th><th>principle</th><th>inspects</th><th>value</th><th>better</th></tr>" +
@@ -819,22 +1118,28 @@
     var d = el("div", { class: "block" }, "<h3>" + esc(c.title) + "</h3>");
     var labels = c.labels || []; var series = c.series || [];
     var W = 520, H = 200, L = 40, B = 34, T = 8;
-    var max = 0; series.forEach(function (s) { s.values.forEach(function (v) { if (v > max) max = v; }); });
-    max = max || 1;
+    // value axis spans [min(0, smallest), max(0, largest)] so negative values (e.g. a feature that
+    // pushes a score down) draw below a zero line instead of as invisible negative-height bars
+    var max = 0, min = 0;
+    series.forEach(function (s) { s.values.forEach(function (v) { if (v > max) max = v; if (v < min) min = v; }); });
+    if (max === min) max = 1;
+    var plotH = H - B - T;
+    function y(v) { return T + plotH * (max - v) / (max - min); }
     var g = svg("svg", { viewBox: "0 0 " + W + " " + H, class: "chart", width: "100%", role: "img", "aria-label": c.title });
-    svg("line", { class: "axis", x1: L, y1: H - B, x2: W - 4, y2: H - B }, g);
+    svg("line", { class: "axis", x1: L, y1: y(0), x2: W - 4, y2: y(0) }, g);
     svg("line", { class: "axis", x1: L, y1: T, x2: L, y2: H - B }, g);
-    [0, 0.5, 1].forEach(function (f) {
-      var t = svg("text", { x: L - 4, y: H - B - f * (H - B - T) + 3, "text-anchor": "end" }, g); t.textContent = fmt(max * f);
+    (min < 0 ? [min, 0, max] : [0, max / 2, max]).forEach(function (v) {
+      var t = svg("text", { x: L - 4, y: y(v) + 3, "text-anchor": "end" }, g); t.textContent = fmt(v);
     });
     var n = labels.length || 1; var slot = (W - L - 8) / n;
     var overlay = c.type === "hist";
     var bw = overlay ? slot * 0.9 : slot * 0.8 / Math.max(series.length, 1);
     series.forEach(function (s, si) {
       s.values.forEach(function (v, i) {
-        var h = (H - B - T) * (v / max);
+        var top = Math.min(y(v), y(0)), h = Math.abs(y(v) - y(0));
         var x = L + 4 + i * slot + (overlay ? 0 : si * bw);
-        var b = svg("rect", { x: x, y: H - B - h, width: Math.max(1, bw - 1), height: h, class: "bar s" + ([0, 1, 2, 3][si] || si) }, g);
+        var b = svg("rect", { x: x, y: top, width: Math.max(1, bw - 1), height: Math.max(h, 0.5),
+                              class: "bar s" + ([0, 1, 2, 3][si] || si) + (v < 0 ? " neg" : "") }, g);
         if (overlay) b.setAttribute("fill-opacity", "0.55");
         var tt = svg("title", null, b); tt.textContent = s.name + " · " + labels[i] + ": " + fmt(v);
       });
@@ -862,8 +1167,10 @@
     scored().models.forEach(function (m) { ms.appendChild(el("option", { value: m }, esc(m))); });
     var open = el("a", { class: "btn", target: "_blank", rel: "noopener" }, "open ↗");
     var dl = el("a", { class: "btn" }, "download .html");
+    var js = el("a", { class: "btn" }, "download .mct.json");
+    js.title = "the same card in Google's Model Card Toolkit JSON schema";
     bar.appendChild(el("span", { class: "dim" }, "model card for")); bar.appendChild(ms);
-    bar.appendChild(open); bar.appendChild(dl);
+    bar.appendChild(open); bar.appendChild(dl); if (S.live) bar.appendChild(js);
     bar.appendChild(el("span", { class: "dim small" }, "includes every formula + intermediate table, and your governance checklist once attached"));
     var frame = el("iframe", { class: "card", title: "Model card" });
     box.appendChild(bar); box.appendChild(frame);
@@ -872,6 +1179,8 @@
       if (S.live) {
         var u = "api/card/" + encodeURIComponent(r.run_id) + "/" + encodeURIComponent(m) + "?v=" + Date.now();
         frame.removeAttribute("srcdoc"); frame.src = u; open.href = u; dl.href = u;
+        js.href = "api/card-json/" + encodeURIComponent(r.run_id) + "/" + encodeURIComponent(m);
+        js.setAttribute("download", m + ".mct.json");
       } else {
         var html = (S.replay.cards || {})[m] || "";
         frame.srcdoc = html;
@@ -904,7 +1213,9 @@
     box.appendChild(bar);
     box.appendChild(el("p", { class: "prose" }, "Accountability, human oversight and well-being can't be measured from a model and a dataset — no tool can. " +
       "What a team <i>can</i> do is answer a recognised checklist and keep the answers next to the metrics. Source: <a href='" + esc(c.url) + "' target='_blank' rel='noopener'>" +
-      esc(c.source) + "</a>. " + esc(c.scope) + " Items are ethikit's condensed paraphrase — use the original for a formal audit."));
+      esc(c.source) + "</a>. " + esc(c.scope) + " " + esc(c.provenance.line) +
+      (c.provenance.drift_notes.length ? " <details class='small'><summary>provenance notes</summary>" +
+        c.provenance.drift_notes.map(function (n) { return "<p>" + esc(n) + "</p>"; }).join("") + "</details>" : "")));
     var grid = el("div", { class: "gov-grid" });
     var left = el("div"), right = el("div", { class: "sticky" });
     var sec = null;
@@ -912,7 +1223,8 @@
       if (it.section !== sec) { sec = it.section; left.appendChild(el("div", { class: "gsec" }, esc(sec))); }
       var a = S.answers[it.id] || {};
       var row = el("div", { class: "gitem" }, "<span class='id'>" + esc(it.id) + "</span>");
-      var body = el("div", null, "<div class='q'>" + esc(it.text) + "</div><div class='tags'>→ " + it.principles.map(esc).join(", ") + "</div>");
+      var body = el("div", null, "<div class='q'>" + esc(it.text) + "</div><div class='tags'>→ " + it.principles.map(esc).join(", ") +
+        (it.ref && it.ref !== it.section ? " · original: " + esc(it.ref) : "") + "</div>");
       var ctl = el("div", { class: "ctl" });
       ["yes", "partial", "no", "n/a"].forEach(function (v) {
         var lab = el("label", { class: v.replace("/", "") }, "");
@@ -975,7 +1287,7 @@
     return out;
   }
   function toMarkdown(c) {
-    var lines = ["# " + c.name, "", "Source: " + c.source + " -- " + c.url, "", "_Condensed, paraphrased items via ethikit; use the original for a formal audit._"];
+    var lines = ["# " + c.name, "", "Source: " + c.source + " -- " + c.url, "", "_" + c.provenance.line + "_"];
     var sec = null;
     c.items.forEach(function (it) {
       if (it.section !== sec) { sec = it.section; lines.push("", "## " + sec, ""); }
@@ -992,8 +1304,122 @@
 
   // ------------------------------------------------------------------ tabs
   function showTab(name) {
-    document.querySelectorAll(".tabs button").forEach(function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === name)); });
-    ["results", "inspect", "card", "gov"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
+    document.querySelectorAll(".tabs button").forEach(function (b) {
+      b.setAttribute("aria-selected", String(b.dataset.tab === name)); b.tabIndex = b.dataset.tab === name ? 0 : -1;
+    });
+    ["results", "inspect", "card", "data", "suite", "history", "gov"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
+    if (name === "history") renderHistory();
+  }
+
+  // ------------------------------------------------------------------ reference suites
+  function domainInfo() {
+    return (S.meta.domains || []).filter(function (d) { return d.id === S.domain; })[0];
+  }
+
+  function setMode(m) {
+    S.mode = m;
+    document.body.classList.toggle("suite-mode", m === "suite");
+    ["#row-domain", "#row-suite-datasets", "#row-suite-opts", "#row-suite-caveats"].forEach(function (s) { $(s).hidden = m !== "suite"; });
+    if (m === "suite") renderDomain();
+    update();
+  }
+
+  function renderDomain() {
+    var d = domainInfo(); if (!d) return;
+    $("#domain-strength").textContent = d.strength;
+    $("#domain-strength").className = "pill " + (d.strength === "suite" ? "" : d.strength === "gap" ? "red" : "gold");
+    $("#domain-blurb").textContent = d.strength_text;
+    $("#states-wrap").hidden = d.id !== "census";
+    var box = $("#suite-datasets"); box.innerHTML = "";
+    if (!d.datasets.length) box.appendChild(el("div", { class: "dim" }, "no datasets: " + esc(d.strength_text)));
+    d.datasets.slice(0, 40).forEach(function (s) {
+      var row = el("div", { class: "ds-row", "data-id": s.id }, "<span class='t' title='" + esc(s.source + " · sensitive: " + s.sensitive) + "'>" + esc(s.title) + "</span>");
+      row.appendChild(el("span", { class: "st" }, s.verified ? "verified" : "first run on your machine"));
+      box.appendChild(row);
+    });
+    $("#suite-caveats").innerHTML = d.caveats.map(function (c) { return "<div>! " + esc(c) + "</div>"; }).join("") +
+      (d.for_whom ? "<div class='dim' style='margin-top:6px'>For: " + esc(d.for_whom) + "</div>" : "");
+  }
+
+  function runSuite() {
+    var sc = suiteConfig();
+    log("run", "» " + commandLine().replace(/\s*\\\n\s*/g, " "));
+    $("#graph").innerHTML = ""; drawGraphIdle();
+    fetch("api/domain-run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) })
+      .then(function (resp) {
+        var reader = resp.body.getReader(); var dec = new TextDecoder(); var buf = "";
+        function pump() {
+          return reader.read().then(function (r) {
+            if (r.done) { if (buf.trim()) onSuiteEvent(JSON.parse(buf)); return finish(); }
+            buf += dec.decode(r.value, { stream: true });
+            var lines = buf.split("\n"); buf = lines.pop();
+            lines.forEach(function (l) { if (l.trim()) onSuiteEvent(JSON.parse(l)); });
+            return pump();
+          });
+        }
+        return pump();
+      }).catch(function (e) { log("err", "connection error: " + e.message); finish(); });
+  }
+
+  function dsRow(id) { return document.querySelector("#suite-datasets .ds-row[data-id='" + id + "']"); }
+
+  function onSuiteEvent(e) {
+    switch (e.type) {
+      case "domain_start":
+        log("run", "suite " + e.domain + ": " + e.datasets.length + " datasets × " + e.models.length + " models × " + e.tools.length + " tools");
+        $("#prog").style.width = "0%"; S.suiteDone = 0; S.suiteTotal = e.datasets.length; break;
+      case "dataset_start": {
+        log("fit", "data  [" + e.i + "/" + e.n + "] " + e.title);
+        var r = dsRow(e.id); if (r) { r.className = "ds-row run"; r.lastChild.textContent = "running…"; }
+        $("#prog-text").textContent = "dataset " + e.i + " / " + e.n; break; }
+      case "dataset_done": {
+        log("ok", "      ✓ " + e.n_rows + " rows · positive rate " + e.positive_rate + " · " + e.seconds + "s");
+        var r2 = dsRow(e.id); if (r2) { r2.className = "ds-row ok"; r2.lastChild.textContent = "done · " + e.n_rows + " rows"; }
+        S.suiteDone++; $("#prog").style.width = (100 * S.suiteDone / S.suiteTotal) + "%"; break; }
+      case "dataset_skip": {
+        log("err", "      ✗ skipped: " + e.reason);
+        var r3 = dsRow(e.id); if (r3) { r3.className = "ds-row skip"; r3.lastChild.textContent = "skipped"; r3.firstChild.title = e.reason; }
+        S.suiteDone++; $("#prog").style.width = (100 * S.suiteDone / S.suiteTotal) + "%"; break; }
+      case "domain_done": log("ok", "done  " + e.n_datasets + " dataset(s) ran, " + e.n_skipped + " skipped"); break;
+      case "error": log("err", "error " + e.error); S.suite = null; $("#tab-suite").innerHTML = "<div class='note'>" + esc(e.error) + "</div>"; showTab("suite"); break;
+      case "domain_result":
+        S.suite = e; $("#run-label").textContent = e.domain + " suite · " + e.datasets.length + " datasets";
+        renderSuite(); showTab("suite"); log("ok", "leading families: " + Object.keys(e.top_family).map(function (p) { return p + "=" + e.top_family[p]; }).join(", ")); break;
+    }
+  }
+
+  function renderSuite() {
+    var r = S.suite; var box = $("#tab-suite"); box.innerHTML = "";
+    var order = ["utility", "fairness", "inclusiveness", "explainability", "transparency", "privacy", "safety"];
+    var cols = order.filter(function (p) { return r.family_table.some(function (x) { return x.principle === p; }); });
+    var fams = Array.from(new Set(r.family_table.map(function (x) { return x.family; })));
+    function cell(f, p) { var x = r.family_table.filter(function (y) { return y.family === f && y.principle === p; })[0];
+      return x ? "<td class='heat' style='--h:" + (x.mean || 0) + "'>" + fmt(x.mean) + " <span class='dim'>±" + (x.std == null ? "–" : x.std.toFixed(2)) + "</span></td>" : "<td>–</td>"; }
+    var rel = "<div class='tscroll'><table class='t'><tr><th>family</th>" + cols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "</tr>" +
+      fams.map(function (f) { return "<tr><td>" + esc(f) + "</td>" + cols.map(function (c) { return cell(f, c); }).join("") + "</tr>"; }).join("") + "</table></div>";
+    var labels = r.key_metric_labels; var mets = Object.keys(labels).filter(function (m) { return r.absolute_table.some(function (x) { return x[m] != null; }); });
+    var abs = "<div class='tscroll'><table class='t'><tr><th>family</th>" + mets.map(function (m) { return "<th>" + esc(labels[m]) + "</th>"; }).join("") + "</tr>" +
+      r.absolute_table.map(function (x) { return "<tr><td>" + esc(x.family) + "</td>" + mets.map(function (m) { return "<td>" + fmt(x[m]) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>";
+    var lead = cols.map(function (p) { return "<tr><td>" + esc(p) + "</td><td class='l'>" + esc(r.top_family[p]) + "</td><td>" + (r.datasets.length < 2 ? "–" : Math.round(100 * (r.agreement[p] || 0)) + "%") + "</td><td class='l'>" +
+      (r.significance[p] && r.significance[p].p_value != null ? "p=" + r.significance[p].p_value + (r.significance[p]["significant_at_0.05"] ? " (significant)" : " (not significant)") : "<span class='dim'>" + esc((r.significance[p] || {}).skipped || "") + "</span>") + "</td></tr>"; }).join("");
+    var sl = r.shortlist;
+    box.innerHTML =
+      "<h3>" + esc(r.title) + "</h3><p class='prose'><b>" + esc(r.strength_text) + ".</b> " + r.datasets.length + " dataset(s) ran" +
+      (r.skipped.length ? ", " + r.skipped.length + " skipped (hover the grey rows above for why)" : "") + (r.cv ? "; each scored with " + r.cv[0] + "×" + r.cv[1] + " cross-validation" : "") +
+      ". This is a <i>prior</i> about kinds of model in this field — not a verdict on any model for your population.</p>" +
+      "<h3>family evidence — relative (0–1, mean ± std over datasets)</h3>" + rel +
+      "<h3>the same families in real units</h3><p class='dim small'>Relative scores only say who beat whom <i>here</i>; these say how good, actually (accuracy, AUC, stability, fidelity: higher is better; gaps and MI advantage: lower is better).</p>" + abs +
+      "<h3>does the ordering hold up?</h3><div class='tscroll'><table class='t'><tr><th>principle</th><th>leading family</th><th>also leads on…</th><th>Friedman over datasets</th></tr>" + lead + "</table></div>" +
+      "<div class='res-grid'><div><h3>starting shortlist for your own data</h3><p class='prose'>Families to try first: " + sl.families.map(function (f) { return "<span class='pill'>" + esc(f) + "</span>"; }).join("") +
+      "<br>Models: " + sl.models.map(esc).join(", ") + "<br><span class='dim small'>weights used: " + Object.keys(sl.weights_used).map(function (k) { return k + "=" + sl.weights_used[k]; }).join(", ") + ". " + esc(sl.caveat) + "</span></p>" +
+      "<button class='btn primary' id='use-shortlist' type='button'>use this shortlist on my data</button></div>" +
+      "<div><h3>caveats</h3><div class='note'>" + r.caveats.concat(r.notes || []).map(function (c) { return "<div>! " + esc(c) + "</div>"; }).join("") + "</div>" +
+      "<h3 style='margin-top:14px'>datasets that ran</h3>" + r.datasets.map(function (d) { return "<div class='small'><b>" + esc(d.id) + "</b> · " + d.n_rows + " rows · sensitive: " + esc(d.sensitive) + (d.verified ? "" : " <span class='dim'>(first real run of this loader)</span>") + "</div>"; }).join("") + "</div></div>";
+    $("#use-shortlist").addEventListener("click", function () {
+      S.models = new Set(sl.models); document.querySelector("input[name=mode][value=mine]").checked = true;
+      setMode("mine"); renderModels(); update(); window.scrollTo({ top: 0, behavior: "smooth" });
+      log("ok", "shortlist loaded: " + sl.models.join(", ") + " — now choose your data and run");
+    });
   }
 
   boot();

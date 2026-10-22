@@ -8,7 +8,7 @@ that best fits their context.
 
 Built around the principle sets published by **UNESCO, Microsoft, IBM, and Google**.
 
-**Where this is going:** see [ROADMAP.md](ROADMAP.md) -- milestones M1-M7 to completion, each with an exit test.
+**Where this is going:** [ROADMAP.md](ROADMAP.md) -- milestones M1-M7 to completion. **How to check it works:** [TESTING.md](TESTING.md) -- automated commands and a visual checklist for every milestone, plus a baseline you can run today.
 
 ## What it is -- and isn't
 
@@ -62,14 +62,14 @@ shift. See `examples/run_phase3_demo.py`.
 ethikit runs entirely on your machine: no accounts, no hosting, nothing leaves your computer
 (only the optional OpenML datasets, Adult and German Credit, need the network).
 
-**1. Set up** (Python 3.11 or 3.12 recommended; 3.13 works but the drift tool can't install)
+**1. Set up** (Python 3.12 is the project standard; 3.13 runs but the drift tool can't install there)
 
 ```bash
-git clone https://github.com/Amudhan-05/ethikit && cd ethikit
+git clone https://github.com/AmudhanS-05/Ethikit && cd Ethikit
 python3.12 -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt                            # everything, incl. optional tools
-# minimal alternative: pip install -e .                    # scikit-learn only; tools needing
-#                                                          # missing libraries are skipped
+# minimal alternative: pip install -r requirements-core.txt # scikit-learn only; tools needing
+#                                                          # missing libraries are skipped (and say how to enable them)
 ```
 
 **2. Start the console** and leave it running
@@ -88,9 +88,10 @@ python -m ethikit run --trace                         # synthetic data, every mo
 python -m ethikit run --data loans.csv --target approved --sensitive sex
 python -m ethikit list tools | models | datasets | params <name> | checklists
 python -m ethikit checklist deon --out answers.json   # governance checklist template
+python -m ethikit run --bundle audit.zip              # + the audit bundle (see below)
 ```
 
-Outputs go to `./ethikit_out/` (`report.html`, `model_cards/`, `results.json`); that folder is
+Outputs go to `./ethikit_out/` (`report.html`, `model_cards/` with `.html` + `.mct.json`, `results.json`); that folder is
 disposable. Everything is also pip-installable: `pip install -e .` adds an `ethikit` command.
 
 **Other entry points:** `python -m examples.run_demo` (original single-split demo),
@@ -98,11 +99,123 @@ disposable. Everything is also pip-installable: `pip install -e .` adds an `ethi
 `pip install pmlb`), `run_phase3_demo` (membership inference, adversarial attack, drift),
 `streamlit run demo/app.py` (older Streamlit UI).
 
+**4. Check it works**
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -m "not e2e"     # ~40 s
+python -m pytest -m e2e           # drives the console in headless Chromium (playwright install chromium first),
+                                  # including accessibility checks (axe-core) in both themes
+python -m examples.rehearse_demo  # times every terminal step of the demo script against its budget
+```
+
+On macOS / Linux the `Makefile` has the same as one-liners: `make demo`, `make test`, `make e2e`,
+`make bundle`, `make rehearse`.
+
+[TESTING.md](TESTING.md) lists what every test guarantees and a visual checklist to verify by eye.
+
 **Troubleshooting**
 - *A tool shows "not installed" in the console:* `pip install` its package (see `requirements.txt`); the rest still run.
 - *`alibi-detect` fails to build:* use Python 3.11/3.12.
 - *Port in use:* `python -m ethikit serve --port 9000`.
 - *Loading `--model-file`:* only load files you trust; they are unpickled.
+
+## Choosing, not ranking: requirements, stability, profile, history
+
+```bash
+ethikit run --require "demographic_parity_diff<=0.1" --require "membership_inference_advantage<0.2"
+ethikit profile --data loans.csv --target approved --sensitive sex   # the data alone, before any model
+ethikit runs list                                                    # every run is saved in ./ethikit_runs
+ethikit runs diff <run_a> <run_b>                                    # what changed, config and scores
+ethikit run --config <run_id | config.json | results.json>           # reproduce a run exactly
+ethikit run ... --export-config my_audit.json                        # save a config without running
+```
+
+- **Requirements** are hard limits on raw metric values. Models that fail are listed with the
+  requirement and the margin, never hidden; an unmeasured metric counts as a failure.
+- **Choice stability** says how far your weights would have to move before a different model
+  comes first ("decision_tree stays first while fairness's share is 0.00-0.95; above that
+  random_forest takes over").
+- **Data profile** runs before any model: group sizes, base rates per group, a proxy screen
+  (can the other features recover the sensitive attribute?), and missingness.
+- **History**: every run is saved locally (`ETHIKIT_RUNS` to move it); diff two runs, or reload
+  one's config in the console's *history* tab. *export config* / *import config* do the same by file.
+
+## Tools (14) and the what-if
+
+Every principle a tool can measure has at least two independent tools, and every tool says what
+it does **not** measure (shown in *inspect* and on the model card). `ethikit list tools` lists them.
+
+```bash
+ethikit whatif --models logistic_regression --method exponentiated_gradient --constraint demographic_parity
+ethikit explain --models decision_tree --row 4        # why this one row got its score
+```
+
+The **what-if** trains a fairness-constrained version of a model (fairlearn) and shows the cost
+before and after. It is a counterfactual: it never changes any audit score.
+
+## Hand it to a reviewer: the audit bundle
+
+```bash
+ethikit run --models logistic_regression,random_forest --bundle audit.zip
+ethikit bundle verify audit.zip          # re-runs it and compares every number
+ethikit datasheet --data loans.csv --target approved --sensitive sex   # datasheet for your data
+```
+
+One zip with everything a reviewer needs to **reproduce or challenge every number**: the config,
+all results, `metrics.csv`, every tool's worked maths, the report, the model cards (HTML, plus
+JSON in Google's Model Card Toolkit schema), a datasheet for the dataset (Gebru et al.; ethikit
+fills in what it can measure and leaves the human questions to you), the governance checklist
+answers, the library versions, a README and checksums. `bundle verify` reports any number that
+was edited or does not reproduce. The console has the same as an "export audit bundle" button.
+Every page also prints cleanly (light, no buttons, all sections open), so "Save as PDF" works.
+
+The four governance checklists record their edition and whether they are verbatim or a
+paraphrase; Deon is the verbatim upstream text (MIT, see THIRD_PARTY_NOTICES.md).
+
+## Deep learning on tabular data (optional)
+
+"Tabular" = spreadsheet-shaped data: one row per case, one column per feature. The **deep**
+family always has scikit-learn's `mlp`. Install PyTorch to add two more (CPU wheels are small):
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install captum opacus
+python -m ethikit run --family deep --tools performance,membership_inference,captum_ig
+```
+
+- `torch_mlp` -- a small PyTorch network that speaks scikit-learn, so every tool, the console
+  and the model card treat it like any other model (layers, learning rate, epochs are tunable).
+- `torch_mlp_dp` -- the same network trained with **differential privacy** (DP-SGD, Opacus).
+  Its model card states the privacy budget actually spent (epsilon, delta).
+- `captum_ig` -- integrated gradients read from the network itself, with a completeness check
+  (the attributions must add up to the change in the prediction).
+
+On small, noisy data a large plain network memorises its training set; the DP version does not.
+One measured example (TESTING.md, M5): membership-inference advantage **0.41 → 0.05** at
+epsilon = 1, with test accuracy 0.62 → 0.67. DP can also *widen* a fairness gap (it costs
+accuracy most on small groups), so look at the fairness column too -- that is the trade-off
+the audit is there to show.
+
+## Reference suites: choosing a starting model before you have data
+
+No data or trained model of your own yet? A **reference suite** runs the same ethics battery over
+several public datasets from one domain and reports which *kinds* of model tend to do well there.
+It is a prior, never a verdict: re-test the shortlist on your own data as soon as you have it.
+
+```bash
+python -m ethikit domains list                       # census, lending, health, justice, hiring (gap)
+python -m ethikit domains info lending               # datasets, sources, sensitive attributes, caveats
+python -m ethikit domains run census --max-datasets 3
+python -m ethikit domains run justice --cv 3x2       # repeated CV: every number gets a spread
+```
+
+or in the console: `--mode reference suite`. You get family-level tables (relative 0-1 scores *and*
+real units such as accuracy and parity gap), whether the leading family also leads on each dataset,
+a Friedman test when there is enough data, and a starting shortlist ("use this shortlist on my
+data"). Suites say how thin they are: `gap` (hiring: bring your own data), `single`, `small`, `suite`.
+Datasets download once and are cached in `~/.cache/ethikit`. The census suite needs
+`pip install folktables`. See [TESTING.md](TESTING.md) (live checks L1-L8) for which loaders have
+been verified against real data.
 
 ## The console and the CLI
 
@@ -127,7 +240,9 @@ ethikit run --synthetic n=2000 minority_share=0.15 bias=1.5          # tunable s
 ethikit run --model-param random_forest.max_depth=5                  # any hyperparameter
 ethikit run --estimator xt=sklearn.ensemble.ExtraTreesClassifier     # any estimator class
 ethikit run --model-file mine=model.joblib --no-scale ...            # your own trained model, as-is
+ethikit run --model-file net=model.pt ...                            # a PyTorch nn.Module (or .keras/.h5)
 ethikit run --tool-param robustness.sigma=0.25                       # any tool parameter
+ethikit run --cv 5x3                                                 # repeated k-fold: every score gets a spread
 ethikit list params random_forest | ethikit list tools | ethikit checklist altai
 ```
 
@@ -145,6 +260,9 @@ All local. With the console running, open **http://127.0.0.1:8765/docs/**; or op
 | [Field Guide](docs/field-guide.html) | A timed live-demo script plus a component reference, for presenting ethikit. |
 | [Sample Report](docs/report.html) | A real aggregate report from `run_demo.py`. |
 | [Console replay](docs/console/index.html) | A static replay of a recorded run, for when you can't run Python. The live console is `python -m ethikit serve`. |
+| [ROADMAP.md](ROADMAP.md) | Milestones M1-M7, what each delivered, and what is still open. |
+| [TESTING.md](TESTING.md) | For every milestone: the automated tests and a manual / visual checklist. |
+| [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | Licences of the texts and schema ethikit reproduces. |
 
 `docs/report.html` is a snapshot generated by `run_demo.py`; refresh the console replay with
 `python -m ethikit export-site docs`.
@@ -160,42 +278,44 @@ ethikit/
   principles.py          canonical principle taxonomy (UNESCO/MSFT/IBM/Google + provenance)
   coverage.py            reverse map: principle -> tools (+ each tool's static mechanism)
   core/types.py          Dataset, EvalContext, EvalResult (value + mechanism + details), TaskType
-  evaluators/            one file per ethics tool; all share the Evaluator interface
+  evaluators/            one file per tool, all on the Evaluator interface (14 tools)
     base.py              Evaluator ABC + registry  <-- add new tools here
     performance.py       utility axis (accuracy / f1 / auc / r2)
     fairness.py          fairlearn -> numpy fallback (demographic parity, equalized odds)
-    explainability.py    surrogate fidelity + shap attributions -> permutation-importance fallback
-    robustness.py        perturbation stability under random Gaussian noise (dependency-free)
-    privacy.py           REAL membership-inference attack (confidence/loss-threshold,
-                          cross-validated attack classifier) -- no proxy anymore
-    giskard_scan.py       unified scan (subgroup performance bias -> fairness, perturbation
-                          robustness -> safety); data-leakage scan not wired in
-    art_robustness.py     Phase 3: real black-box adversarial attack (HopSkipJump via ART) --
-                          worst-case robustness, complementing robustness.py's random-noise case
-    drift.py               Phase 3: Alibi Detect's statistical drift test against a manufactured
-                          covariate shift + the model's own performance drop under it
-  data/loaders.py        Adult (+ synthetic fallback), RawData + split_dataset() so a
-                          single split and repeated CV scale/split identically
+    aif360_eval.py       AIF360: disparate impact, equal opportunity, average odds, Theil index
+    calibration.py       expected calibration error, overall and between groups
+    subgroup.py          worst-group accuracy and the best-worst gap
+    explainability.py    surrogate fidelity + SHAP attributions
+    permutation.py       importance concentration, reliance on the sensitive column
+    captum_ig.py         integrated gradients for PyTorch networks (completeness-checked)
+    robustness.py        stability under random Gaussian noise (dependency-free)
+    art_robustness.py    real black-box adversarial attack (HopSkipJump via ART)
+    drift.py             Alibi Detect drift test against a manufactured covariate shift
+    privacy.py           real membership-inference attack (Yeom et al. 2018)
+    attribute_inference.py  second privacy attack: does the output reveal the sensitive attribute?
+    giskard_scan.py      unified scan (subgroup bias -> fairness, perturbations -> safety)
+  data/loaders.py        Adult / German credit / CSV / synthetic, RawData + split_dataset()
+  domains/               reference suites per domain (census, lending, health, ...)
   benchmark/
-    models.py            classifier + regressor zoo grouped by family (linear/tree/kernel/…)
+    models.py            model zoo by family, incl. deep (sklearn MLP, PyTorch MLP, DP variant)
     runner.py            train sweep -> run evaluator battery -> tidy records
-    cv.py                 Phase 2: repeated stratified K-fold -> a score DISTRIBUTION
-                          per model instead of one split's point estimate
-    meta.py                Phase 2: the same sweep across many PMLB datasets, aggregated,
-                          for family-level tendencies across datasets (not one dataset; not per-domain)
-  scoring/
-    aggregate.py          normalize -> profile -> Pareto -> optional weighted score
-    significance.py        Phase 2: Friedman + Nemenyi + critical-difference diagram,
-                          so "model A beats model B" is backed by a hypothesis test
-  report/
-    report.py            self-contained aggregate HTML report
-    model_card.py         one Model Card per model (schema-compliant HTML;
-                          model-card-toolkit sidecar JSON when installable)
-demo/app.py              Streamlit UI (Plotly radar + per-model Model Card viewer)
-examples/
-  run_demo.py            single-dataset, single-split end-to-end CLI demo
-  run_phase2_demo.py      CV + significance + meta-benchmark + regression fairness
-  run_phase3_demo.py      membership inference + adversarial robustness + drift detection
+    cv.py, meta.py       repeated K-fold; the same sweep across many datasets
+  deep.py                PyTorch MLP with optional DP-SGD (Opacus); torch / Keras adapters
+  scoring/               normalize -> profile -> Pareto -> optional weights; significance tests
+  decision.py            hard requirements, choice stability under nearby weights
+  profile.py             data profile: groups, base rates, proxy screen, missingness
+  datasheet.py           datasheet for the dataset, pre-filled from the profile
+  mitigation.py          fairness what-if (counterfactual, never part of the audit)
+  explain.py             why did a model score this one row the way it did
+  runs.py                local run history: save, list, diff, replay
+  checklists.py          Deon (verbatim) / ALTAI / Datasheets / NIST AI RMF, with provenance
+  bundle.py              audit bundle: write, and verify by re-running
+  session.py             one run config shared by the CLI and the console
+  cli.py, server.py      `ethikit ...` and the local web console (standard library only)
+  web/                   the console (HTML/JS/CSS) and the shared theme
+  report/                aggregate report, model cards (+ Model Card Toolkit JSON schema)
+demo/app.py              older Streamlit UI
+examples/                run_demo, run_phase2_demo, run_phase3_demo, rehearse_demo
 ```
 
 ## Extending it (the whole point)

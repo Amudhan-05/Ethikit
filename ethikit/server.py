@@ -35,7 +35,7 @@ from . import checklists as checklists_mod
 from . import session
 from .benchmark.models import load_fitted_model
 from .benchmark.runner import jsonable
-from .report import model_card_html, report_html
+from .report import model_card_html, model_card_json, report_html
 
 WEB = Path(__file__).resolve().parent / "web"
 # The docs live beside the package in a source checkout; served at /docs/ so the whole
@@ -47,6 +47,21 @@ _LOCK = threading.Lock()
 UPLOADS: Dict[str, pd.DataFrame] = {}
 MODELS: Dict[str, Any] = {}
 RUNS: Dict[str, dict] = {}
+
+
+def _fitted(run: dict, name: str):
+    """The fitted model for local explanations: pre-trained uploads as-is, otherwise refit from the
+    run's own factory on the run's own training split (deterministic seeds) and cache it."""
+    cache = run.setdefault("fitted", {})
+    if name not in cache:
+        p = run["prepared"]
+        if name in p.prefit:
+            cache[name] = p.prefit[name]
+        elif name in p.factories:
+            cache[name] = p.factories[name]().fit(p.dataset.X_train, p.dataset.y_train)
+        else:
+            raise KeyError(f"no model {name!r} in this run")
+    return cache[name]
 
 
 def describe_frame(df: pd.DataFrame) -> dict:
@@ -101,6 +116,8 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         path = unquote(url.path)
         try:
+            if path == "/favicon.ico":               # the page declares an inline icon; answer quietly
+                return self._send(204, b"", "image/x-icon")
             if path in ("/", "/index.html"):
                 return self._static("index.html")
             if path == "/api/meta":
@@ -108,6 +125,45 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/card/"):
                 _, _, _, run_id, model = path.split("/", 4)
                 return self._card(run_id, model)
+            if path.startswith("/api/card-json/"):
+                _, _, _, run_id, model = path.split("/", 4)
+                args, kwargs = self._card_args(run_id, model)
+                return self._send(200, json.dumps(model_card_json(*args, **kwargs), indent=2).encode(),
+                                  "application/json",
+                                  {"Content-Disposition": f'attachment; filename="{model}.mct.json"'})
+            if path == "/api/runs":
+                from .runs import list_runs
+                return self._json({"runs": list_runs()})
+            if path.startswith("/api/runs/"):
+                from .runs import load_run
+                return self._json(load_run(path.rsplit("/", 1)[1]))
+            if path == "/api/runs-diff":
+                from .runs import diff_runs
+                q = parse_qs(url.query)
+                return self._json(diff_runs(q["a"][0], q["b"][0]))
+            if path.startswith("/api/explain/"):
+                from .explain import explain_row
+                _, _, _, run_id, model = path.split("/", 4)
+                run = RUNS[run_id]
+                row = int(parse_qs(url.query).get("row", ["0"])[0])
+                return self._json(explain_row(_fitted(run, model), run["prepared"].dataset, row))
+            if path.startswith("/api/datasheet/"):
+                from . import datasheet as ds_mod
+                sheet = self._datasheet(path.rsplit("/", 1)[1])
+                fmt = parse_qs(url.query).get("format", ["json"])[0]
+                if fmt == "md":
+                    return self._send(200, ds_mod.to_markdown(sheet).encode(), "text/markdown; charset=utf-8",
+                                      {"Content-Disposition": 'attachment; filename="datasheet.md"'})
+                if fmt == "html":
+                    return self._send(200, ds_mod.to_html(sheet).encode(), "text/html; charset=utf-8")
+                return self._json(sheet)
+            if path.startswith("/api/bundle/"):
+                from .bundle import bundle_bytes
+                run = RUNS[path.rsplit("/", 1)[1]]
+                data = bundle_bytes(run["config"], run["summary"], run.get("checklist"),
+                                    run.get("datasheet_answers"))
+                return self._send(200, data, "application/zip",
+                                  {"Content-Disposition": 'attachment; filename="ethikit_bundle.zip"'})
             if path.startswith("/api/report/"):
                 run = RUNS[path.rsplit("/", 1)[1]]
                 s = run["summary"]
@@ -120,6 +176,14 @@ class Handler(BaseHTTPRequestHandler):
                 md = checklists_mod.to_markdown(cl["checklist"], cl.get("answers"))
                 return self._send(200, md.encode(), "text/markdown; charset=utf-8",
                                   {"Content-Disposition": f'attachment; filename="{cl["checklist"]}.md"'})
+            if (path == "/docs" or path.startswith("/docs/")) and not DOCS.is_dir():
+                msg = ("<!doctype html><html lang='en'><meta charset='utf-8'><title>ethikit docs</title>"
+                       "<body style='font-family:sans-serif;max-width:640px;margin:40px auto'>"
+                       "<h1>Docs are not installed</h1><p>The docs ship with the source checkout, not the "
+                       "pip package. Clone <a href='https://github.com/AmudhanS-05/Ethikit'>the repository</a> "
+                       "and run <code>python -m ethikit serve</code> from it to have them at /docs/.</p>"
+                       "<p><a href='/'>back to the console</a></p></body></html>")
+                return self._send(200, msg.encode(), "text/html; charset=utf-8")
             if path == "/docs" or path == "/docs/":
                 return self._static("index.html", DOCS)
             if path.startswith("/docs/"):
@@ -159,6 +223,23 @@ class Handler(BaseHTTPRequestHandler):
                                    "n_features_in": getattr(model, "n_features_in_", None)})
             if url.path == "/api/run":
                 return self._run(json.loads(self._body() or b"{}"))
+            if url.path == "/api/domain-run":
+                return self._domain_run(json.loads(self._body() or b"{}"))
+            if url.path == "/api/whatif":
+                from .mitigation import mitigate
+                body = json.loads(self._body() or b"{}")
+                run = RUNS[body["run_id"]]
+                p = run["prepared"]
+                if body["model"] not in p.factories:
+                    raise ValueError("the what-if retrains the model, so it needs a zoo model or estimator, "
+                                     "not a pre-trained upload")
+                return self._json(mitigate(p.dataset, p.factories[body["model"]], body.get("method", "exponentiated_gradient"),
+                                           body.get("constraint", "demographic_parity"), seed=p.dataset_seed))
+            if url.path.startswith("/api/datasheet/"):
+                run_id = url.path.rsplit("/", 1)[1]
+                answers = json.loads(self._body() or b"{}").get("answers") or {}
+                RUNS[run_id]["datasheet_answers"] = {k: str(v) for k, v in answers.items()}
+                return self._json(self._datasheet(run_id))
             if url.path.startswith("/api/checklist/"):
                 run_id = url.path.rsplit("/", 1)[1]
                 data = json.loads(self._body() or b"{}")
@@ -180,15 +261,65 @@ class Handler(BaseHTTPRequestHandler):
             ctype += "; charset=utf-8"
         self._send(200, target.read_bytes(), ctype)
 
-    def _card(self, run_id: str, model: str):
+    @staticmethod
+    def _datasheet(run_id: str) -> dict:
+        from . import datasheet as ds_mod
         run = RUNS[run_id]
         s = run["summary"]
-        html = model_card_html(model, s["dataset"], run["raw"], run["objective"], s["pareto"],
-                               sensitive_name=s["sensitive"],
-                               hyperparameters=run["prepared"].hyperparameters.get(model),
-                               origin=run["prepared"].origins.get(model),
-                               checklist=run.get("checklist"))
-        self._send(200, html.encode(), "text/html; charset=utf-8")
+        sheet = ds_mod.build_datasheet(s.get("profile") or {"dataset": s["dataset"]}, run["config"],
+                                       s.get("feature_names"))
+        return ds_mod.merge_answers(sheet, run.get("datasheet_answers") or {})
+
+    @staticmethod
+    def _card_args(run_id: str, model: str):
+        run = RUNS[run_id]
+        s = run["summary"]
+        return ((model, s["dataset"], run["raw"], run["objective"], s["pareto"]),
+                dict(sensitive_name=s["sensitive"],
+                     hyperparameters=run["prepared"].hyperparameters.get(model),
+                     origin=run["prepared"].origins.get(model),
+                     checklist=run.get("checklist"),
+                     requirements=((s.get("requirements") or {}).get("by_model") or {}).get(model),
+                     data_profile=s.get("profile")))
+
+    def _card(self, run_id: str, model: str):
+        args, kwargs = self._card_args(run_id, model)
+        self._send(200, model_card_html(*args, **kwargs).encode(), "text/html; charset=utf-8")
+
+    def _domain_run(self, cfg: dict):
+        """Stream a reference-suite run: dataset_start / dataset_done / dataset_skip events,
+        then a final `domain_result` (family evidence + shortlist)."""
+        from .domains import get_domains, run_domain, shortlist
+        from .domains.runner import DomainError
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+        def emit(event: dict):
+            self.wfile.write((json.dumps(jsonable(event)) + "\n").encode())
+            self.wfile.flush()
+        try:
+            states = tuple(s for s in (cfg.get("states") or "").replace(" ", "").split(",") if s)
+            domains = get_domains(*([states] if states else []))
+            if cfg.get("domain") not in domains:
+                raise DomainError(f"unknown domain {cfg.get('domain')!r}; choose from {', '.join(domains)}")
+            cv = cfg.get("cv")
+            res = run_domain(domains[cfg["domain"]], models=cfg.get("models") or None,
+                             tools=cfg.get("tools") or None,
+                             max_datasets=int(cfg["max_datasets"]) if cfg.get("max_datasets") else None,
+                             max_rows=int(cfg.get("max_rows") or 5000), seed=int(cfg.get("seed") or 0),
+                             cv=(int(cv[0]), int(cv[1])) if cv else None, on_event=emit)
+            emit({"type": "domain_result", **res.to_dict(), "shortlist": shortlist(res, cfg.get("weights"))})
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        except Exception as exc:
+            try:
+                emit({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
+            except (BrokenPipeError, ConnectionResetError):
+                return
+        self.close_connection = True
 
     def _run(self, config: dict):
         """Stream NDJSON events while the sweep runs, then a final `result`."""

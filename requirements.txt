@@ -9,7 +9,7 @@ scikit-learn>=1.3
 # Recommended open-source ethics tools (unlock richer evaluators)
 fairlearn>=0.10        # fairness metrics + mitigation
 shap>=0.44             # explainability (feature attributions)
-giskard>=2.0           # unified ML+LLM scan: subgroup performance bias, robustness,
+giskard>=2.0,<3        # 2.19 verified on Py3.12; 3.x pulls numba (NumPy<=1.26 clash) and was non-deterministic here. Unified ML+LLM scan: subgroup performance bias, robustness,
                        # spurious correlation (data-leakage scan not wired in yet)
 aif360>=0.6.1          # 70+ fairness metrics (IBM, Apache-2.0); 0.6.1 installs on
                        # Python 3.11-3.13 -- the old 0.5.x build failure no longer applies
@@ -26,6 +26,9 @@ streamlit>=1.30
 plotly>=5.18
 matplotlib>=3.7        # backs pandas Styler.background_gradient in the leaderboard table
 
+# Reference suites (census domain downloads ACS data through folktables)
+folktables>=0.0.12      # US Census ACS tasks; data is fetched once from census.gov and cached
+
 # Phase 2 (generalization / meta-benchmark / significance)
 pmlb>=1.0               # meta-benchmark dataset suite (github-hosted, no API key)
 scipy>=1.11              # Friedman test (already pulled in transitively by giskard)
@@ -36,8 +39,13 @@ scikit-posthocs>=0.9    # Nemenyi post-hoc + critical-difference diagram
 # (0.8.11) hard-pins pandas~=1.4, which has no Python 3.12 wheel and fails to
 # build from source here (confirmed by hand); its own attack algorithm is
 # implemented natively instead of pulling the unmaintained package in.
-# opacus               # DP-SGD for PyTorch (not wired in; no evaluator needs it yet)
 
-# Phase 4 (deep learning + LLMs)
-# captum               # DL explainability
+# Deep learning (M5), optional. Without these the "deep" family still has scikit-learn's MLP.
+# CPU-only wheels are much smaller than the default CUDA ones:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install captum opacus
+# torch                # torch_mlp model
+# captum               # captum_ig tool (integrated gradients)
+# opacus               # torch_mlp_dp model (DP-SGD)
+
+# Extended work, not wired in (LLM track; see ROADMAP)
 # deepeval             # LLM evaluation + red-teaming (deepteam)

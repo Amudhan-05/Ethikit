@@ -13,10 +13,13 @@ requires-python = ">=3.10"
 dependencies = ["numpy>=1.24,<2", "pandas>=2.0", "scikit-learn>=1.3"]
 
 [project.optional-dependencies]
-full = ["fairlearn>=0.10", "shap>=0.44", "aif360>=0.6.1", "giskard>=2.0", "streamlit>=1.30", "plotly>=5.18",
+full = ["fairlearn>=0.10", "shap>=0.44", "aif360>=0.6.1", "giskard>=2.0,<3", "streamlit>=1.30", "plotly>=5.18",
        "matplotlib>=3.7"]
 phase2 = ["pmlb>=1.0", "scipy>=1.11", "scikit-posthocs>=0.9"]
 phase3 = ["adversarial-robustness-toolbox>=1.17", "alibi-detect>=0.12"]
+domains = ["folktables>=0.0.12"]
+deep = ["torch>=2.2", "captum>=0.7", "opacus>=1.5"]
+dev = ["pytest>=8", "jsonschema>=4", "pyyaml>=6", "playwright>=1.45", "axe-playwright-python>=0.1.4"]
 
 [project.scripts]
 ethikit = "ethikit.cli:main"
@@ -25,4 +28,12 @@ ethikit = "ethikit.cli:main"
 include = ["ethikit*"]
 
 [tool.setuptools.package-data]
-ethikit = ["web/*"]
+ethikit = ["web/*", "report/schemas/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "e2e: browser end-to-end tests (need playwright + chromium); run with `pytest -m e2e`",
+    "slow: takes more than a few seconds",
+    "network: needs internet access; skips itself when offline",
+]

@@ -87,6 +87,7 @@ class MembershipInferenceEvaluator(Evaluator):
         "membership leakage from this feature); higher means the model's "
         "outputs let an attacker tell training rows apart from held-out rows."
     )
+    limits = ('One black-box attack (confidence/loss threshold) on held-out vs training rows. It does not cover attribute inference (see attribute_inference), model extraction, or data reconstruction, and it is not a differential-privacy guarantee.')
     formula = (
         "per row: conf(x, y) = f(x)[y],  loss(x, y) = −log conf(x, y)\n"
         "members M = n train rows, non-members N = n test rows (balanced)\n"
@@ -159,9 +160,17 @@ class MembershipInferenceEvaluator(Evaluator):
                      "series": [{"name": "members", "values": [int(v) for v in h_mem]},
                                 {"name": "non-members", "values": [int(v) for v in h_non]}]}],
         )
+        eps = getattr(ctx.model, "epsilon_", None)
+        if eps is not None:
+            # the model was trained with differential privacy: say what was promised next to what
+            # the attack actually achieved
+            mechanism += (f" The model was trained with DP-SGD: (epsilon={eps:.2f}, "
+                          f"delta={getattr(ctx.model, 'delta_', None):.1e}).")
+            trace["steps"].insert(0, f"model trained with differential privacy: epsilon = {eps:.2f} "
+                                     f"(smaller = stronger guarantee), delta = {getattr(ctx.model, 'delta_', 0):.1e}")
         details = {
             "n_members_used": n, "feature_set": desc, "n_splits": n_splits,
-            "attack_accuracy": round(attack_acc, 4), "trace": trace,
+            "attack_accuracy": round(attack_acc, 4), "trace": trace, "dp_epsilon": eps,
         }
         return [
             EvalResult(self.name, "privacy", InspectionTarget.BEHAVIOR,

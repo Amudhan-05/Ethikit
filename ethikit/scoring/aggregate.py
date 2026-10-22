@@ -58,6 +58,7 @@ def objective_matrix(df_norm: pd.DataFrame) -> pd.DataFrame:
     the Pareto front is computed over (so fairness-vs-accuracy shows up)."""
     prof = principle_profile(df_norm)
     prof.insert(0, "utility", _utility_series(df_norm).round(3))
+    prof.attrs = {}          # don't drag the run's traces along: pandas deep-copies attrs on every op
     return prof
 
 

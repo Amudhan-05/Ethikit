@@ -1,0 +1,7 @@
+# Everything, plus what the tests need:  pip install -r requirements-dev.txt
+-r requirements.txt
+pytest>=8
+jsonschema>=4       # validates the exported Model Card Toolkit JSON
+pyyaml>=6           # live check of the Deon checklist against upstream
+playwright>=1.45        # console end-to-end tests; then: playwright install chromium
+axe-playwright-python>=0.1.4   # accessibility checks (axe-core) in tests/e2e/test_a11y.py
