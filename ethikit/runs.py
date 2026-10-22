@@ -55,23 +55,26 @@ def save_run(config: dict, summary: dict) -> str:
     (d / "summary.json").write_text(json.dumps(jsonable(summary)))
     (d / "meta.json").write_text(json.dumps({
         "run_id": d.name, "created_utc": stamp, "dataset": summary.get("dataset"),
+        "created_ns": time.time_ns(),
         "models": sorted((summary.get("objective") or {}).keys()), "cv": summary.get("cv"),
         "ethikit_version": __version__}, indent=2))
     return d.name
 
 
 def list_runs(limit: int = 50) -> List[dict]:
-    out = []
-    for d in sorted(runs_dir().iterdir(), reverse=True):
+    """Saved runs, newest first (the run id only has one-second resolution, so ``created_ns`` breaks ties)."""
+    found = []
+    for d in runs_dir().iterdir():
         meta = d / "meta.json"
         if d.is_dir() and meta.exists():
             try:
-                out.append(json.loads(meta.read_text()))
+                m = json.loads(meta.read_text())
             except Exception:
                 continue
-        if len(out) >= limit:
-            break
-    return out
+            found.append(((m.get("created_ns") or meta.stat().st_mtime_ns, d.name), m))
+    found.sort(key=lambda x: x[0], reverse=True)
+    return [m for _, m in found[:limit]]
+
 
 
 def load_run(run_id: str) -> Dict[str, Any]:
