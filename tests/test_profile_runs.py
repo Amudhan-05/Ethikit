@@ -74,6 +74,12 @@ def test_nothing_feasible_is_explained():
 
 
 # ------------------------------------------------------------------ run history
+def test_runs_saved_in_the_same_second_list_newest_first():
+    # run ids only have one-second resolution; the order must not depend on the config hash
+    ids = [save_run({"seed": i}, {"dataset": "x"}) for i in range(12)]
+    assert [r["run_id"] for r in list_runs()] == ids[::-1]
+
+
 def test_every_run_is_saved_and_can_be_listed_loaded_and_reproduced():
     s1 = session.execute(session.prepare(CFG))["summary"]
     rid = s1["history_id"]
